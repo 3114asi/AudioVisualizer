@@ -4,49 +4,51 @@ using UnityEngine;
 /// ScriptableObject — единственное место для всех параметров визуализатора.
 /// Создать: Assets → Create → AudioVisualizer → Settings.
 /// Все поля изменяемы в Inspector в Play Mode без перекомпиляции.
+///
+/// ВАЖНО: colorLeft/colorRight — HDR-цвета (intensity > 1).
+/// Активировать HDR в Inspector: нажать кружок рядом с полем цвета → HDR.
+/// Рекомендуемые значения intensity: 2-4 (даст визуальный «блум»).
 /// </summary>
 [CreateAssetMenu(fileName = "VisualizerSettings", menuName = "AudioVisualizer/Settings")]
 public class VisualizerSettings : ScriptableObject
 {
     [Header("Ring Geometry")]
-    /// Количество световых точек, равномерно распределённых по кольцу
-    public int particleCount = 130;
-    /// Базовый радиус кольца в мировых единицах
-    public float baseRadius = 3f;
-    /// Максимальный радиальный выброс частицы при пиковой амплитуде
-    public float maxRadialOffset = 1.5f;
+    public int   particleCount   = 130;
+    public float baseRadius      = 3f;
+    /// Максимальный сдвиг наружу = maxRadialOffsetFraction * baseRadius.
+    /// 0.18 = 18 % — частица не улетит дальше 18 % радиуса при любой амплитуде.
+    [Range(0.05f, 0.50f)]
+    public float maxRadialOffsetFraction = 0.18f;
 
-    [Header("Colors")]
-    /// Цвет левой дуги — cyan (#3FC6FF)
-    public Color colorLeft  = new Color(0.247f, 0.776f, 1.000f);
-    /// Цвет правой дуги — magenta (#E040FB)
-    public Color colorRight = new Color(0.878f, 0.251f, 0.984f);
+    [Header("Colors (HDR — поставьте intensity 2-4 в Inspector)")]
+    [ColorUsage(true, true)]   // showAlpha=true, hdr=true
+    public Color colorLeft  = new Color(0.247f, 0.776f, 1.000f) * 2.5f; // CYAN  #3FC6FF ×2.5
+    [ColorUsage(true, true)]
+    public Color colorRight = new Color(0.878f, 0.251f, 0.984f) * 2.5f; // MAGENTA #E040FB ×2.5
 
     [Header("Audio")]
-    /// Множитель, применяемый к значениям полос FFT
-    [Range(0.5f, 3f)] public float sensitivity = 1.35f;
-    /// Размер FFT-окна (степень двойки); больше = лучше разрешение, выше CPU
-    public int fftSize = 1024;
-    /// Количество частотных полос после логарифмического rebinning
-    [Range(32, 128)] public int bandCount = 64;
+    [Range(0.5f, 4f)]  public float sensitivity = 1.35f;
+    public int fftSize   = 1024;
+    [Range(32, 128)]   public int bandCount    = 64;
 
-    [Header("Smoothing")]
-    /// Скорость нарастания полосы — выше = быстрее attack, резче реакция
+    [Header("Smoothing — temporal")]
     [Range(0.01f, 1f)] public float attack  = 0.30f;
-    /// Скорость спада полосы — ниже = дольше «хвост» после пика
     [Range(0.01f, 1f)] public float release = 0.08f;
+    /// Temporal lerp для позиции частиц кольца (0.15 = плавный, 1 = мгновенный).
+    [Range(0.05f, 1f)] public float particlePositionLerp = 0.15f;
+
+    [Header("Smoothing — spatial (по индексу полос)")]
+    /// Число соседних полос для усреднения с каждой стороны (0 = выкл).
+    /// 3 рекомендуется: убирает DC-spike сверху без потери детализации.
+    [Range(0, 8)]      public int spatialSmoothHalfWidth = 3;
 
     [Header("Particle Size")]
-    /// Размер частицы кольца в тишине
     public float particleSizeMin = 0.06f;
-    /// Размер частицы кольца при пиковой амплитуде
     public float particleSizeMax = 0.22f;
 
     [Header("Bass Burst")]
-    /// Сумма 4 нижних полос, при превышении которой срабатывает выброс
-    [Range(0f, 4f)] public float burstThreshold = 0.60f;
-    /// Начальная скорость частиц выброса (стриков)
+    [Range(0f, 2f)] public float burstThreshold = 0.30f;
     public float burstForce    = 6f;
-    /// Минимальная пауза между выбросами в секундах
     public float burstCooldown = 0.10f;
+    [Range(1, 64)]  public int   burstMaxSparks  = 48;
 }
