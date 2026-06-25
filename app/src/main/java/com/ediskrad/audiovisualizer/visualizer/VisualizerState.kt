@@ -10,7 +10,7 @@ data class VisualizerState(
     val bass: Float = 0f,
     val mids: Float = 0f,
     val highs: Float = 0f,
-    val sensitivity: Float = 1.35f,
+    val sensitivity: Float = 1.80f,
     val fps: Int = 60,
     val message: String = "Ready",
     val sparks: List<SparkState> = emptyList(),
