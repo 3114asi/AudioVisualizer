@@ -2,19 +2,17 @@ package com.ediskrad.audiovisualizer.visualizer
 
 import android.media.projection.MediaProjection
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.ediskrad.audiovisualizer.audio.AudioCaptureMode
 import com.ediskrad.audiovisualizer.audio.AudioFrame
 import com.ediskrad.audiovisualizer.audio.AudioProvider
 import com.ediskrad.audiovisualizer.audio.VisualizerConfig
+import com.ediskrad.audiovisualizer.audio.capture.FakeAudioProvider
 import com.ediskrad.audiovisualizer.audio.capture.MicrophoneAudioProvider
 import com.ediskrad.audiovisualizer.audio.capture.PlaybackCaptureAudioProvider
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
 
@@ -54,7 +52,8 @@ class VisualizerViewModel : ViewModel() {
         sparkEngine.clear()
         val config = VisualizerConfig(sensitivity = _state.value.sensitivity)
         provider = when (_state.value.captureMode) {
-            AudioCaptureMode.MICROPHONE -> MicrophoneAudioProvider(config)
+            AudioCaptureMode.MICROPHONE     -> MicrophoneAudioProvider(config)
+            AudioCaptureMode.FAKE           -> FakeAudioProvider(config)
             AudioCaptureMode.INTERNAL_AUDIO -> {
                 val projection = mediaProjection
                 if (projection == null) {
@@ -64,28 +63,30 @@ class VisualizerViewModel : ViewModel() {
                 PlaybackCaptureAudioProvider(projection, config)
             }
         }
+        // Колбэк приходит с потока провайдера (~60 fps).
+        // SparkEngine.update() выполняется INLINE (без дополнительного dispatch),
+        // чтобы исключить гонку данных на mutableListOf внутри пула искр.
+        // StateFlow.update() сам по себе потокобезопасен.
         provider?.start { frame ->
             val now = System.currentTimeMillis()
+            val updatedSparks = sparkEngine.update(frame, now)
             frameCounter++
-            if (now - lastFpsStamp >= 1_000L) {
-                _state.update { s -> s.copy(fps = frameCounter) }
-                frameCounter = 0
+            val newFps = if (now - lastFpsStamp >= 1_000L) {
                 lastFpsStamp = now
-            }
-            viewModelScope.launch(Dispatchers.Default) {
-                val updatedSparks = sparkEngine.update(frame, now)
-                _state.update {
-                    it.copy(
-                        isRunning = true,
-                        spectrum  = frame.spectrum.toList(),
-                        volume    = frame.volume,
-                        bass      = frame.bass,
-                        mids      = frame.mids,
-                        highs     = frame.highs,
-                        sparks    = updatedSparks,
-                        message   = "Visualizer is live.",
-                    )
-                }
+                val f = frameCounter; frameCounter = 0; f
+            } else null
+            _state.update { s ->
+                s.copy(
+                    isRunning = true,
+                    spectrum  = frame.spectrum.toList(),
+                    volume    = frame.volume,
+                    bass      = frame.bass,
+                    mids      = frame.mids,
+                    highs     = frame.highs,
+                    sparks    = updatedSparks,
+                    fps       = newFps ?: s.fps,
+                    message   = "Visualizer is live.",
+                )
             }
         }
     }
@@ -155,13 +156,14 @@ private class SparkEngine {
             pool.add(
                 SparkState(
                     angle         = angle,
-                    // speed: доли radius в мс; max дистанция за 350ms ≈ 0.9*radius
-                    speed         = 0.0007f + amp * 0.0012f + frame.bass * 0.0006f,
+                    // speed: доли radius в мс. 0.0020 → за 300ms улетит на 60% от radius
+                    speed         = 0.0015f + amp * 0.0020f + frame.bass * 0.0012f,
                     startMs       = nowMs,
-                    maxLifeMs     = (130L + (amp * 270L).toLong()).coerceIn(80L, 400L),
-                    // colorFraction: 0=CYAN слева (cos=−1), 1=MAGENTA справа (cos=+1)
+                    maxLifeMs     = (200L + (amp * 300L).toLong()).coerceIn(120L, 500L),
                     colorFraction = (cos(angle.toDouble()).toFloat() + 1f) / 2f,
-                    size          = 2.5f + amp * 4.5f + frame.bass * 2f,
+                    // Пиксели canvas. Типичный экран 1080px → radius≈254px.
+                    // size 8–20px → ядро 8–20px, halo ×6 = 48–120px → хорошо видно.
+                    size          = 8f + amp * 12f + frame.bass * 8f,
                 )
             )
         }

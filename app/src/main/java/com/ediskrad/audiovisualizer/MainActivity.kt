@@ -92,11 +92,23 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+
+        // ADB debug: adb shell am start -n pkg/.MainActivity --ez fake_audio true
+        // Запускает FakeAudio без запроса разрешений для автоматического тестирования.
+        if (intent.getBooleanExtra("fake_audio", false)) {
+            viewModel.setCaptureMode(AudioCaptureMode.FAKE)
+            viewModel.start()
+        }
     }
 
     private fun ensurePermissionAndStart(mode: AudioCaptureMode) {
         pendingStartAfterPermission = true
         when (mode) {
+            AudioCaptureMode.FAKE -> {
+                // FakeAudio не требует разрешений
+                viewModel.start()
+                pendingStartAfterPermission = false
+            }
             AudioCaptureMode.MICROPHONE -> {
                 val granted = ContextCompat.checkSelfPermission(
                     this,

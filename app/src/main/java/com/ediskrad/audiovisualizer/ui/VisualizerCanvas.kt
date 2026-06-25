@@ -159,38 +159,41 @@ fun VisualizerCanvas(
 
         val nowMs = System.currentTimeMillis()
         for (spark in state.sparks) {
-            val age      = (nowMs - spark.startMs).coerceAtLeast(0L)
-            val progress = (age.toFloat() / spark.maxLifeMs).coerceIn(0f, 1f)
-            val lifeAlpha = 1f - progress                         // linear fade-out
-            val dist     = radius * (1f + spark.speed * age)      // расстояние от центра
+            val age       = (nowMs - spark.startMs).coerceAtLeast(0L)
+            val progress  = (age.toFloat() / spark.maxLifeMs).coerceIn(0f, 1f)
+            // Кубическое затухание — быстрый fade в конце, долгий яркий хвост в начале
+            val lifeAlpha = (1f - progress) * (1f - progress)
+            val dist      = radius * (1f + spark.speed * age)
 
             val sx = cx + cos(spark.angle) * dist
             val sy = cy + sin(spark.angle) * dist
-
-            // FIX #3: цвет по colorFraction, рассчитанной в SparkEngine из cos(angle)
             val sparkColor = lerp(CYAN, MAGENTA, spark.colorFraction)
 
-            // FIX #4: каждая искра — маленький bloom: внешний ореол + яркое ядро
-            val sr = spark.size * (1f - progress * 0.5f) // слегка уменьшается к концу
+            // Размер: пиксели. sr≈14–28px даёт хорошо видимую искру на HD-экране
+            val sr = spark.size * (1f - progress * 0.4f)
 
-            // ореол
+            // 3-слойная искра: широкий diffuse → средний bloom → белое ядро
             drawCircle(
-                color     = sparkColor.copy(alpha = 0.30f * lifeAlpha),
-                radius    = sr * 3.2f,
+                color     = sparkColor.copy(alpha = 0.20f * lifeAlpha),
+                radius    = sr * 6f,
                 center    = Offset(sx, sy),
                 blendMode = BlendMode.Screen,
             )
-            // ядро
             drawCircle(
-                color     = sparkColor.copy(alpha = 0.90f * lifeAlpha),
+                color     = sparkColor.copy(alpha = 0.65f * lifeAlpha),
+                radius    = sr * 2.2f,
+                center    = Offset(sx, sy),
+                blendMode = BlendMode.Screen,
+            )
+            drawCircle(
+                color     = sparkColor.copy(alpha = 1.00f * lifeAlpha),
                 radius    = sr,
                 center    = Offset(sx, sy),
                 blendMode = BlendMode.Screen,
             )
-            // белая горячая точка в центре
             drawCircle(
-                color     = Color.White.copy(alpha = 0.70f * lifeAlpha),
-                radius    = sr * 0.45f,
+                color     = Color.White.copy(alpha = 0.90f * lifeAlpha),
+                radius    = sr * 0.40f,
                 center    = Offset(sx, sy),
                 blendMode = BlendMode.Screen,
             )
