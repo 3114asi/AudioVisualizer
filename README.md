@@ -79,11 +79,24 @@ Windows:
 - Для Windows-пути с не-ASCII символами включен `android.overridePathCheck=true`.
 - Для `compileSdk = 35` добавлен `android.suppressUnsupportedCompileSdk=35`, чтобы текущая версия AGP не шумела при синхронизации.
 
+## Unity-реализация
+
+Директория `unity/` содержит альтернативную реализацию на Unity 6 (URP):
+
+- Кольцо из дискретных светящихся частиц с аддитивным блендингом и URP Bloom.
+- Градиент по углу: cyan (#3FC6FF) → magenta (#E040FB).
+- Bass-burst: стрики наружу от кольца при ударах баса.
+- Те же два режима входа: Microphone и Internal Audio (scaffold).
+
+**Скрипты:** `unity/Scripts/`
+**Инструкция по сборке:** `unity/UNITY_SETUP.md`
+
 ## Для разработчиков и ИИ
 
 - Быстрый архитектурный контекст: `AI_CONTEXT.md`
 - Инструкции по изменению проекта: `AGENTS.md`
 - Подробная архитектура: `docs/ARCHITECTURE.md`
+- Unity-реализация: `unity/UNITY_SETUP.md`
 
 ## Примечание по пути проекта
 

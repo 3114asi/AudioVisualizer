@@ -87,3 +87,35 @@
 - вынести параметры визуализации в отдельный persistent settings layer;
 - добавить release build, baseline profiles и профилирование;
 - заменить `Canvas`-рендер на OpenGL/Vulkan при необходимости более тяжелых эффектов.
+
+## Unity Implementation (`unity/`)
+
+Параллельная реализация на Unity 6 URP с иной визуальной моделью:
+кольцо из дискретных частиц (не сплошная линия) с аддитивным блендингом и URP Bloom.
+
+### Архитектура Unity
+
+```
+AudioCaptureController (+ AudioSource)
+        │
+        ▼
+SpectrumProcessor — логарифмический rebinning FFT → float[] Bands[64]
+        │
+        ├──▶ ParticleRingController — Particle System (Billboard, Additive)
+        │         SetParticles() каждый кадр: pos = f(Bands[i]), color = gradient(angle)
+        │
+        └──▶ BurstEmitter — Particle System (StretchedBillboard, Additive)
+                  Emit() при sum(Bands[0..3]) > burstThreshold
+```
+
+### Ключевые файлы Unity
+
+| Файл | Роль |
+|---|---|
+| `VisualizerSettings.cs` | ScriptableObject — все параметры |
+| `AudioCaptureController.cs` | Mic input + Internal Audio scaffold |
+| `SpectrumProcessor.cs` | FFT → bands + smoothing |
+| `ParticleRingController.cs` | Кольцо частиц с цветом по углу |
+| `BurstEmitter.cs` | Bass-burst стрики |
+| `UIController.cs` | UI overlay |
+| `UNITY_SETUP.md` | Полная инструкция по сборке сцены |

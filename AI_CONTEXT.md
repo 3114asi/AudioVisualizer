@@ -49,8 +49,24 @@ Current project intentionally creates the `MediaProjection` inside `MediaProject
    - grant `Show screen`
 4. Run `.\gradlew.bat assembleDebug`.
 
+## Unity Implementation
+
+Directory `unity/` contains a parallel Unity 6 (URP) implementation:
+
+- `unity/Scripts/VisualizerSettings.cs` — ScriptableObject with all tunable params.
+- `unity/Scripts/AudioCaptureController.cs` — Mic + Internal Audio scaffold.
+- `unity/Scripts/SpectrumProcessor.cs` — FFT → 64 bands, log rebinning, attack/release smoothing.
+- `unity/Scripts/ParticleRingController.cs` — discrete particle ring, color by angle, radial FFT reaction.
+- `unity/Scripts/BurstEmitter.cs` — bass-triggered outward streak bursts (StretchedBillboard).
+- `unity/Scripts/UIController.cs` — Start/Stop, mode toggle, sensitivity slider, FPS counter.
+- `unity/UNITY_SETUP.md` — full scene hierarchy, material, URP Bloom, and Android build instructions.
+
+Internal Audio in Unity is a scaffold (falls back to mic). Full implementation requires a Kotlin plugin
+mirroring `audio/capture/PlaybackCaptureAudioProvider.kt` with a JNI bridge.
+
 ## Known Limitations
 
 - Some apps cannot be captured due to Android playback capture policy.
 - Visualizer uses Compose Canvas, not OpenGL.
 - No persistent settings storage yet.
+- Unity Internal Audio capture is not yet implemented (scaffold + TODO comments).

@@ -9,6 +9,7 @@ This file is for AI coding agents and human contributors who need a fast, reliab
 1. `AI_CONTEXT.md`
 2. `docs/ARCHITECTURE.md`
 3. `README.md`
+4. `unity/UNITY_SETUP.md` — если работаешь с Unity-реализацией
 
 ## Non-Negotiable Rules
 
