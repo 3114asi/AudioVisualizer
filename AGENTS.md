@@ -6,6 +6,30 @@ This file tells AI agents how to contribute to the NeonPortalScene visual matchi
 
 Iterate the Unity NeonPortalScene scene until a real Unity render in `ref/current.png` achieves >98% SSIM similarity to `ref/1.png`. Do not use reference-image plates or screenshot-copy shortcuts.
 
+## Additional Completed Play Mode Task — EnergySphereScene
+
+A separate real-time animated sphere effect from `ref/1.mp4` has been implemented
+in `Assets/Scenes/EnergySphereScene.unity`. This is not the static SSIM
+NeonPortalScene iteration loop.
+
+For future work on the animated sphere:
+
+1. Read `AI_CONTEXT.md`, section **Play Mode EnergySphere Implementation (2026-06-26)**.
+2. Use `Assets/Editor/EnergySphereBuilder.cs` to rebuild/capture the scene.
+3. Keep the effect procedural: `EnergySphereController`, `InnerEnergyMesh`,
+   `EnergyRayBurstSystem`, `EnergySparkSystem`, `EnergyHotspotSystem`,
+   `EnergyAtmosphereParticles`, and the EnergySphere/Inner/Ray/Hotspot/Particle
+   shaders.
+4. Do not replace the sphere with a sprite, screenshot plate, or video playback.
+5. Do not tune mountains, sky, background, or environment when the request is only
+   about the sphere behaviour.
+
+Useful validation command:
+
+```powershell
+& "C:\Program Files\Unity\Hub\Editor\2022.3.52f1\Editor\Unity.exe" -batchmode -quit -projectPath "C:\Users\edisk\OneDrive\Документы\Программирование\Android\AudioVisualizer" -executeMethod "Ediskrad.AudioVisualizer.Editor.EnergySphereBuilder.BuildAndCapture" -logFile "Logs/EnergySphereFinal.log"
+```
+
 ## Before You Start
 
 1. **Read `AI_CONTEXT.md`** — complete technical context, current state, scene map, critical constraints

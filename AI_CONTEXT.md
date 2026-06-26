@@ -7,6 +7,54 @@ Make `Assets/Scenes/NeonPortalScene.unity` match reference `ref/1.png`.
 **Current best (2026-06-26): Iteration094 active — 7-layer ADDITIVE HDR ring.**
 SSIM=0.832, Histogram=0.888 (histogram now ABOVE the raw bg.png ceiling 0.8628).
 
+## Play Mode EnergySphere Implementation (2026-06-26)
+
+Separate from the static SSIM visual-match loop, the project now contains a real
+Play Mode effect scene that recreates the animated sphere behaviour from
+`ref/1.mp4`. The focus is only the sphere: energetic ring, HDR rim/core, cyan-blue
+left/bottom and magenta-pink right/top colour zones, inner translucent waves,
+micro-particles, sparks, local hotspots, thin outward rays, pulsing and Bloom.
+
+### Files
+- Scene: `Assets/Scenes/EnergySphereScene.unity`
+- Editor builder/capture: `Assets/Editor/EnergySphereBuilder.cs`
+- Runtime scene builder: `Assets/Scripts/EnergySphereSceneBuilder.cs`
+- Controller: `Assets/Scripts/EnergySphereController.cs`
+- Inner membrane component: `Assets/Scripts/InnerEnergyMesh.cs`
+- Ray system: `Assets/Scripts/EnergyRayBurstSystem.cs`
+- Spark system: `Assets/Scripts/EnergySparkSystem.cs`
+- Hotspot system: `Assets/Scripts/EnergyHotspotSystem.cs`
+- Atmosphere particles: `Assets/Scripts/EnergyAtmosphereParticles.cs`
+- Ring shader: `Assets/Shaders/EnergySphereRing.shader`
+- Inner membrane shader: `Assets/Shaders/InnerEnergySphere.shader`
+- Ray shader: `Assets/Shaders/EnergyRay.shader`
+- Hotspot shader: `Assets/Shaders/HotspotGlow.shader`
+- Soft particle shader: `Assets/Shaders/EnergyParticle.shader`
+
+### Validation
+Built and captured in Unity 2022.3.52f1 batch mode with exit code 0:
+
+```powershell
+& "C:\Program Files\Unity\Hub\Editor\2022.3.52f1\Editor\Unity.exe" -batchmode -quit -projectPath "C:\Users\edisk\OneDrive\Документы\Программирование\Android\AudioVisualizer" -executeMethod "Ediskrad.AudioVisualizer.Editor.EnergySphereBuilder.BuildAndCapture" -logFile "Logs/EnergySphereFinal.log"
+```
+
+Fresh log `Logs/EnergySphereFinal.log` has no C# compile errors or shader errors;
+only Unity licensing-token warnings appear, and Unity exits successfully. Final
+preview image: `ref/energy_sphere_current.png`. Preview sequence:
+`ref/energy_preview/frame_00.png` through `frame_04.png`.
+
+### Tuning Notes
+- Do not replace the effect with a single sprite, texture plate, or video playback.
+- Keep the effect procedural/additive: ring shader + inner membrane + particle
+  systems + ray/hotspot systems + URP Bloom.
+- The right/top side should stay pink-magenta; the left/bottom side should stay
+  cyan/electric-blue. Drift is slow and controlled, not random colour cycling.
+- The inner area should remain mostly dark, with subtle waves, grid traces and
+  small glowing dots.
+- Rays should remain thin, varied and short-lived; avoid full-screen straight
+  lines.
+- Bloom should be strong but preserve a readable rim.
+
 ### RING LIGHT MODEL REWRITE (Iter074-094) — focus: ring light, HDR, Bloom, gradient
 NeonRingMultiLayer.shader was rewritten from "(luminance profile)×(single colour
 gradient)" to **7 independent ADDITIVE light layers**, each with its own colour,
