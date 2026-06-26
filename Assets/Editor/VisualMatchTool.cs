@@ -711,6 +711,757 @@ namespace Ediskrad.AudioVisualizer.Editor
             Debug.Log("[VisualMatch] Iteration 012 applied: horizon glow behind mountains, ring ColorB.R=0.45.");
         }
 
+        // ────────────────────────────────────────────────────────────────
+        // Iteration 013 – Ring Size +2% + Reduced Haze + ColorB.R Tune
+        // ────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 013 – Ring Size + Haze Reduction")]
+        public static void Iteration013()
+        {
+            LoadScene();
+
+            // 1. Ring: slight scale +2% to match ref r_norm 0.348 (current 0.345)
+            //    ColorB.R 0.45→0.50 for slightly more vivid right-side violet gradient
+            Material ring = LoadMat(RingMatPath);
+            if (ring != null)
+            {
+                ring.SetColor("_ColorA", new Color(0.0f, 0.0f, 6.5f, 1f));
+                ring.SetColor("_ColorB", new Color(0.50f, 0.0f, 5.5f, 1f));
+                ring.SetFloat("_Intensity", 1.30f);
+                ring.SetFloat("_SegmentContrast", 0.18f);
+                EditorUtility.SetDirty(ring);
+            }
+            // Scale ring object by 1.02x
+            GameObject ringObj = GameObject.Find("HDR Energy Ring");
+            if (ringObj != null)
+            {
+                ringObj.transform.localScale = new Vector3(1.02f, 1.02f, 1.02f);
+                EditorUtility.SetDirty(ringObj);
+            }
+
+            // 2. Reduce mist intensity: 0.22→0.18 (less diffuse haze, better histogram)
+            //    Reference sky is darker; too much blue haze hurt histogram (0.881→0.869)
+            Material mist = LoadMat(MistMatPath);
+            if (mist != null)
+            {
+                mist.SetColor("_Color", new Color(0.18f, 0.0f, 0.90f, 0.35f));
+                mist.SetFloat("_Intensity", 0.18f);
+                EditorUtility.SetDirty(mist);
+            }
+
+            // 3. Horizon glow: narrower for more concentrated bottom glow (matches ref)
+            //    Less spread = cleaner mountain silhouettes, more dramatic contrast
+            GameObject horizonGlow = GameObject.Find("Low Horizon Glow");
+            if (horizonGlow != null)
+            {
+                horizonGlow.transform.localPosition = new Vector3(0f, -5.2f, 0.5f);
+                horizonGlow.transform.localScale    = new Vector3(10f, 3f, 1f);
+                EditorUtility.SetDirty(horizonGlow);
+            }
+
+            // 4. Background glow: slight reduction for darker top sky (ref top is very dark)
+            GameObject bg = GameObject.Find("Blue Violet Background Glow");
+            if (bg != null)
+            {
+                Renderer bgRend = bg.GetComponent<Renderer>();
+                if (bgRend != null)
+                {
+                    bgRend.sharedMaterial.SetColor("_Color", new Color(0.12f, 0.0f, 0.75f, 0.30f));
+                    bgRend.sharedMaterial.SetFloat("_Intensity", 0.08f);
+                    EditorUtility.SetDirty(bgRend.sharedMaterial);
+                }
+            }
+
+            // 5. Water reflection: widen slightly for visible bottom center beam
+            Material water = LoadMat(WaterMatPath);
+            if (water != null)
+            {
+                water.SetFloat("_Intensity", 0.80f);
+                water.SetFloat("_Width", 0.14f);
+                EditorUtility.SetDirty(water);
+            }
+
+            // 6. Mountains: unchanged (optimal position established in Iter011)
+            GameObject mountain = GameObject.Find("Dark Mountain Silhouettes");
+            if (mountain != null)
+            {
+                mountain.transform.localScale    = new Vector3(10f, 2.5f, 1f);
+                mountain.transform.localPosition = new Vector3(0f, -6.2f, 0.1f);
+                EditorUtility.SetDirty(mountain);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 013 applied: ring +2%, mist reduced, horizon glow narrowed.");
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // Iteration 014 – Restore atmosphere + keep ColorB.R=0.50
+        // ────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 014 – Restore Atmosphere + Vivid Ring")]
+        public static void Iteration014()
+        {
+            LoadScene();
+
+            // Keep ring improvements from Iter013 (ColorB.R=0.50, scale=1.02)
+            Material ring = LoadMat(RingMatPath);
+            if (ring != null)
+            {
+                ring.SetColor("_ColorA", new Color(0.0f, 0.0f, 6.5f, 1f));
+                ring.SetColor("_ColorB", new Color(0.50f, 0.0f, 5.5f, 1f));
+                ring.SetFloat("_Intensity", 1.30f);
+                ring.SetFloat("_SegmentContrast", 0.18f);
+                EditorUtility.SetDirty(ring);
+            }
+            GameObject ringObj = GameObject.Find("HDR Energy Ring");
+            if (ringObj != null)
+            {
+                ringObj.transform.localScale = new Vector3(1.02f, 1.02f, 1.02f);
+                EditorUtility.SetDirty(ringObj);
+            }
+
+            // Restore mist intensity 0.18→0.22: reference has rich atmospheric clouds
+            // Iter013 showed SSIM dropped 0.627→0.598 with less mist (too sparse vs ref)
+            Material mist = LoadMat(MistMatPath);
+            if (mist != null)
+            {
+                mist.SetColor("_Color", new Color(0.20f, 0.0f, 0.95f, 0.38f));
+                mist.SetFloat("_Intensity", 0.22f);
+                EditorUtility.SetDirty(mist);
+            }
+
+            // Restore horizon glow to wider form for richer bottom atmosphere
+            GameObject horizonGlow = GameObject.Find("Low Horizon Glow");
+            if (horizonGlow != null)
+            {
+                horizonGlow.transform.localPosition = new Vector3(0f, -5.0f, 0.5f);
+                horizonGlow.transform.localScale    = new Vector3(12f, 3.5f, 1f);
+                EditorUtility.SetDirty(horizonGlow);
+            }
+
+            // Background glow: subtle boost for atmospheric sky
+            GameObject bg = GameObject.Find("Blue Violet Background Glow");
+            if (bg != null)
+            {
+                Renderer bgRend = bg.GetComponent<Renderer>();
+                if (bgRend != null)
+                {
+                    bgRend.sharedMaterial.SetColor("_Color", new Color(0.14f, 0.0f, 0.78f, 0.32f));
+                    bgRend.sharedMaterial.SetFloat("_Intensity", 0.09f);
+                    EditorUtility.SetDirty(bgRend.sharedMaterial);
+                }
+            }
+
+            Material water = LoadMat(WaterMatPath);
+            if (water != null)
+            {
+                water.SetFloat("_Intensity", 0.80f);
+                water.SetFloat("_Width", 0.14f);
+                EditorUtility.SetDirty(water);
+            }
+
+            GameObject mountain = GameObject.Find("Dark Mountain Silhouettes");
+            if (mountain != null)
+            {
+                mountain.transform.localScale    = new Vector3(10f, 2.5f, 1f);
+                mountain.transform.localPosition = new Vector3(0f, -6.2f, 0.1f);
+                EditorUtility.SetDirty(mountain);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 014 applied: atmosphere restored, ColorB.R=0.50, ring scale=1.02.");
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // Iteration 015 – Restore horizon (14,4) + PostExposure tune
+        // ────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 015 – Horizon Restore + Exposure Tune")]
+        public static void Iteration015()
+        {
+            LoadScene();
+
+            // Ring: keep best settings from Iter013/014
+            Material ring = LoadMat(RingMatPath);
+            if (ring != null)
+            {
+                ring.SetColor("_ColorA", new Color(0.0f, 0.0f, 6.5f, 1f));
+                ring.SetColor("_ColorB", new Color(0.50f, 0.0f, 5.5f, 1f));
+                ring.SetFloat("_Intensity", 1.30f);
+                ring.SetFloat("_SegmentContrast", 0.18f);
+                EditorUtility.SetDirty(ring);
+            }
+            GameObject ringObj = GameObject.Find("HDR Energy Ring");
+            if (ringObj != null)
+            {
+                ringObj.transform.localScale = new Vector3(1.02f, 1.02f, 1.02f);
+                EditorUtility.SetDirty(ringObj);
+            }
+
+            // Mist: restore to Iter012 color/intensity (best SSIM was with 0.22)
+            Material mist = LoadMat(MistMatPath);
+            if (mist != null)
+            {
+                mist.SetColor("_Color", new Color(0.22f, 0.0f, 1.0f, 0.40f));
+                mist.SetFloat("_Intensity", 0.22f);
+                EditorUtility.SetDirty(mist);
+            }
+
+            // Horizon glow: restore to (14,4) from Iter012 — that was the SSIM peak
+            GameObject horizonGlow = GameObject.Find("Low Horizon Glow");
+            if (horizonGlow != null)
+            {
+                horizonGlow.transform.localPosition = new Vector3(0f, -5.0f, 0.5f);
+                horizonGlow.transform.localScale    = new Vector3(14f, 4f, 1f);
+                EditorUtility.SetDirty(horizonGlow);
+            }
+
+            // Post-processing: postExposure -0.32→-0.28 for slightly brighter output
+            // Reference ring and atmosphere look slightly brighter than our current render
+            // bloom scatter 0.50→0.52 for slightly more radial glow spread
+            RebuildVolumeProfile(
+                bloomIntensity:  0.68f,
+                bloomThreshold:  0.55f,
+                bloomScatter:    0.52f,
+                postExposure:   -0.28f,
+                contrast:        24f,
+                saturation:      14f,
+                colorFilter:     new Color(0.80f, 0.86f, 1.0f));
+            FixPostProcessController(0.68f, 0.20f);
+
+            // Background glow: back to Iter012 levels
+            GameObject bg = GameObject.Find("Blue Violet Background Glow");
+            if (bg != null)
+            {
+                Renderer bgRend = bg.GetComponent<Renderer>();
+                if (bgRend != null)
+                {
+                    bgRend.sharedMaterial.SetColor("_Color", new Color(0.15f, 0.0f, 0.80f, 0.35f));
+                    bgRend.sharedMaterial.SetFloat("_Intensity", 0.09f);
+                    EditorUtility.SetDirty(bgRend.sharedMaterial);
+                }
+            }
+
+            Material water = LoadMat(WaterMatPath);
+            if (water != null)
+            {
+                water.SetFloat("_Intensity", 0.80f);
+                water.SetFloat("_Width", 0.14f);
+                EditorUtility.SetDirty(water);
+            }
+
+            GameObject mountain = GameObject.Find("Dark Mountain Silhouettes");
+            if (mountain != null)
+            {
+                mountain.transform.localScale    = new Vector3(10f, 2.5f, 1f);
+                mountain.transform.localPosition = new Vector3(0f, -6.2f, 0.1f);
+                EditorUtility.SetDirty(mountain);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 015 applied: horizon (14,4) restored, post-exposure -0.28.");
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // Iteration 016 – Exact Iter012 post-proc + ring scale 1.02 + ColorB.R 0.50
+        // ────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 016 – Optimal Post-Proc + Ring Scale")]
+        public static void Iteration016()
+        {
+            LoadScene();
+
+            // Ring: best gradient from Iter013/014, plus size fix
+            Material ring = LoadMat(RingMatPath);
+            if (ring != null)
+            {
+                ring.SetColor("_ColorA", new Color(0.0f, 0.0f, 6.5f, 1f));
+                ring.SetColor("_ColorB", new Color(0.50f, 0.0f, 5.5f, 1f));
+                ring.SetFloat("_Intensity", 1.28f);
+                ring.SetFloat("_SegmentContrast", 0.18f);
+                EditorUtility.SetDirty(ring);
+            }
+            GameObject ringObj = GameObject.Find("HDR Energy Ring");
+            if (ringObj != null)
+            {
+                ringObj.transform.localScale = new Vector3(1.02f, 1.02f, 1.02f);
+                EditorUtility.SetDirty(ringObj);
+            }
+
+            // Mist: exact Iter012 settings (best SSIM was with these)
+            Material mist = LoadMat(MistMatPath);
+            if (mist != null)
+            {
+                mist.SetColor("_Color", new Color(0.22f, 0.0f, 1.0f, 0.40f));
+                mist.SetFloat("_Intensity", 0.22f);
+                EditorUtility.SetDirty(mist);
+            }
+
+            // Horizon glow: (14,4) from Iter012 — best SSIM width
+            GameObject horizonGlow = GameObject.Find("Low Horizon Glow");
+            if (horizonGlow != null)
+            {
+                horizonGlow.transform.localPosition = new Vector3(0f, -5.0f, 0.5f);
+                horizonGlow.transform.localScale    = new Vector3(14f, 4f, 1f);
+                EditorUtility.SetDirty(horizonGlow);
+            }
+
+            // Post-processing: EXACT Iter009/012 settings (the SSIM peak post-proc)
+            // Iter015 changed scatter→0.52, exposure→-0.28 → SSIM dropped 0.627→0.620
+            RebuildVolumeProfile(
+                bloomIntensity:  0.68f,
+                bloomThreshold:  0.55f,
+                bloomScatter:    0.50f,
+                postExposure:   -0.32f,
+                contrast:        25f,
+                saturation:      14f,
+                colorFilter:     new Color(0.78f, 0.84f, 1.0f));
+            FixPostProcessController(0.68f, 0.20f);
+
+            // Background glow: same as Iter012
+            GameObject bg = GameObject.Find("Blue Violet Background Glow");
+            if (bg != null)
+            {
+                Renderer bgRend = bg.GetComponent<Renderer>();
+                if (bgRend != null)
+                {
+                    bgRend.sharedMaterial.SetColor("_Color", new Color(0.15f, 0.0f, 0.80f, 0.35f));
+                    bgRend.sharedMaterial.SetFloat("_Intensity", 0.09f);
+                    EditorUtility.SetDirty(bgRend.sharedMaterial);
+                }
+            }
+
+            Material water = LoadMat(WaterMatPath);
+            if (water != null)
+            {
+                water.SetFloat("_Intensity", 0.80f);
+                water.SetFloat("_Width", 0.14f);
+                EditorUtility.SetDirty(water);
+            }
+
+            GameObject mountain = GameObject.Find("Dark Mountain Silhouettes");
+            if (mountain != null)
+            {
+                mountain.transform.localScale    = new Vector3(10f, 2.5f, 1f);
+                mountain.transform.localPosition = new Vector3(0f, -6.2f, 0.1f);
+                EditorUtility.SetDirty(mountain);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 016: exact Iter012 post-proc, ring scale=1.02, ColorB.R=0.50.");
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // Iteration 017 – Revert ring scale to 1.0 (test if scale was regression)
+        // ────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 017 – Revert Ring Scale")]
+        public static void Iteration017()
+        {
+            LoadScene();
+
+            // Ring: revert scale to 1.0 (Iter013-016 had 1.02 which may have caused SSIM drop)
+            //       Keep ColorB.R=0.50 (Better than 0.45 for histogram)
+            Material ring = LoadMat(RingMatPath);
+            if (ring != null)
+            {
+                ring.SetColor("_ColorA", new Color(0.0f, 0.0f, 6.5f, 1f));
+                ring.SetColor("_ColorB", new Color(0.50f, 0.0f, 5.5f, 1f));
+                ring.SetFloat("_Intensity", 1.28f);
+                ring.SetFloat("_SegmentContrast", 0.18f);
+                EditorUtility.SetDirty(ring);
+            }
+            GameObject ringObj = GameObject.Find("HDR Energy Ring");
+            if (ringObj != null)
+            {
+                ringObj.transform.localScale = Vector3.one;  // revert to default 1.0
+                EditorUtility.SetDirty(ringObj);
+            }
+
+            // All other settings: exact Iter012 (best SSIM=0.627)
+            Material mist = LoadMat(MistMatPath);
+            if (mist != null)
+            {
+                mist.SetColor("_Color", new Color(0.22f, 0.0f, 1.0f, 0.40f));
+                mist.SetFloat("_Intensity", 0.22f);
+                EditorUtility.SetDirty(mist);
+            }
+
+            GameObject horizonGlow = GameObject.Find("Low Horizon Glow");
+            if (horizonGlow != null)
+            {
+                horizonGlow.transform.localPosition = new Vector3(0f, -5.0f, 0.5f);
+                horizonGlow.transform.localScale    = new Vector3(14f, 4f, 1f);
+                EditorUtility.SetDirty(horizonGlow);
+            }
+
+            RebuildVolumeProfile(
+                bloomIntensity:  0.68f,
+                bloomThreshold:  0.55f,
+                bloomScatter:    0.50f,
+                postExposure:   -0.32f,
+                contrast:        25f,
+                saturation:      14f,
+                colorFilter:     new Color(0.78f, 0.84f, 1.0f));
+            FixPostProcessController(0.68f, 0.20f);
+
+            GameObject bg = GameObject.Find("Blue Violet Background Glow");
+            if (bg != null)
+            {
+                Renderer bgRend = bg.GetComponent<Renderer>();
+                if (bgRend != null)
+                {
+                    bgRend.sharedMaterial.SetColor("_Color", new Color(0.15f, 0.0f, 0.80f, 0.35f));
+                    bgRend.sharedMaterial.SetFloat("_Intensity", 0.09f);
+                    EditorUtility.SetDirty(bgRend.sharedMaterial);
+                }
+            }
+
+            Material water = LoadMat(WaterMatPath);
+            if (water != null)
+            {
+                water.SetFloat("_Intensity", 0.80f);
+                water.SetFloat("_Width", 0.14f);
+                EditorUtility.SetDirty(water);
+            }
+
+            GameObject mountain = GameObject.Find("Dark Mountain Silhouettes");
+            if (mountain != null)
+            {
+                mountain.transform.localScale    = new Vector3(10f, 2.5f, 1f);
+                mountain.transform.localPosition = new Vector3(0f, -6.2f, 0.1f);
+                EditorUtility.SetDirty(mountain);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 017: ring scale reverted to 1.0, ColorB.R=0.50.");
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // Iteration 018 – Denser Mist + Higher Saturation
+        // ────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 018 – Dense Mist + Saturation")]
+        public static void Iteration018()
+        {
+            LoadScene();
+
+            // Ring: back to Iter012 ColorB.R=0.45 (Iter017 with 0.50 gave same SSIM)
+            // Revert Intensity to 1.25 for slightly less bloom overlap
+            Material ring = LoadMat(RingMatPath);
+            if (ring != null)
+            {
+                ring.SetColor("_ColorA", new Color(0.0f, 0.0f, 6.5f, 1f));
+                ring.SetColor("_ColorB", new Color(0.45f, 0.0f, 5.5f, 1f));
+                ring.SetFloat("_Intensity", 1.25f);
+                ring.SetFloat("_SegmentContrast", 0.20f);
+                EditorUtility.SetDirty(ring);
+            }
+            GameObject ringObj = GameObject.Find("HDR Energy Ring");
+            if (ringObj != null)
+            {
+                ringObj.transform.localScale = Vector3.one;
+                EditorUtility.SetDirty(ringObj);
+            }
+
+            // Mist: increase from 0.22→0.27 for denser atmospheric clouds
+            // Reference has much richer purple cloud formations below ring
+            // Scatter=0.50 should contain bloom to ring area (not full dome)
+            Material mist = LoadMat(MistMatPath);
+            if (mist != null)
+            {
+                mist.SetColor("_Color", new Color(0.25f, 0.0f, 1.05f, 0.45f));
+                mist.SetFloat("_Intensity", 0.27f);
+                EditorUtility.SetDirty(mist);
+            }
+
+            // Horizon glow: (14,4) from Iter012
+            GameObject horizonGlow = GameObject.Find("Low Horizon Glow");
+            if (horizonGlow != null)
+            {
+                horizonGlow.transform.localPosition = new Vector3(0f, -5.0f, 0.5f);
+                horizonGlow.transform.localScale    = new Vector3(14f, 4f, 1f);
+                EditorUtility.SetDirty(horizonGlow);
+            }
+
+            // Post-proc: increase saturation 14→18 for more vivid purple-violet colors
+            // Reference atmosphere and ring look more saturated than current
+            RebuildVolumeProfile(
+                bloomIntensity:  0.68f,
+                bloomThreshold:  0.55f,
+                bloomScatter:    0.50f,
+                postExposure:   -0.32f,
+                contrast:        25f,
+                saturation:      18f,
+                colorFilter:     new Color(0.78f, 0.84f, 1.0f));
+            FixPostProcessController(0.68f, 0.20f);
+
+            GameObject bg = GameObject.Find("Blue Violet Background Glow");
+            if (bg != null)
+            {
+                Renderer bgRend = bg.GetComponent<Renderer>();
+                if (bgRend != null)
+                {
+                    bgRend.sharedMaterial.SetColor("_Color", new Color(0.15f, 0.0f, 0.80f, 0.35f));
+                    bgRend.sharedMaterial.SetFloat("_Intensity", 0.09f);
+                    EditorUtility.SetDirty(bgRend.sharedMaterial);
+                }
+            }
+
+            Material water = LoadMat(WaterMatPath);
+            if (water != null)
+            {
+                water.SetFloat("_Intensity", 0.80f);
+                water.SetFloat("_Width", 0.14f);
+                EditorUtility.SetDirty(water);
+            }
+
+            GameObject mountain = GameObject.Find("Dark Mountain Silhouettes");
+            if (mountain != null)
+            {
+                mountain.transform.localScale    = new Vector3(10f, 2.5f, 1f);
+                mountain.transform.localPosition = new Vector3(0f, -6.2f, 0.1f);
+                EditorUtility.SetDirty(mountain);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 018: mist 0.27, saturation 18, ColorB.R=0.45.");
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // Iteration 020 – Enable RadialShafts + fix Plasma Dust position + ring R
+        // Root causes: (1) "Random Radial Light Shafts" m_IsActive=0 → enable it
+        //              (2) Magenta Plasma Dust donut radius=7.4 (off-screen) → Box
+        //              (3) Ring ColorB.R=0.45 too high vs ref R/B=0.22 → 0.26
+        // ────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 020 – RadialShafts + Clouds + RingR")]
+        public static void Iteration020()
+        {
+            LoadScene();
+
+            // 1. Enable Radial Light Shafts (was m_IsActive=0 — GameObject.Find skips disabled)
+            var allGOs = Resources.FindObjectsOfTypeAll<GameObject>();
+            GameObject shafts = System.Array.Find(allGOs, go =>
+                go.name == "Random Radial Light Shafts" && go.scene.IsValid());
+            if (shafts != null)
+            {
+                shafts.SetActive(true);
+                EditorUtility.SetDirty(shafts);
+                Debug.Log("[VisualMatch] Random Radial Light Shafts: ENABLED");
+            }
+            else
+                Debug.LogWarning("[VisualMatch] 'Random Radial Light Shafts' not found!");
+
+            // 2. Fix Magenta Plasma Dust: was Donut radius=7.4 (off-screen, invisible)
+            // Convert to Box emitter at bottom of scene with slow-drifting large particles
+            GameObject plasmaDust = GameObject.Find("Magenta Plasma Dust");
+            if (plasmaDust != null)
+            {
+                plasmaDust.transform.localPosition = new Vector3(0f, -5.0f, -0.3f);
+
+                ParticleSystem ps = plasmaDust.GetComponent<ParticleSystem>();
+                if (ps != null)
+                {
+                    var main = ps.main;
+                    main.startSpeed    = new ParticleSystem.MinMaxCurve(0.18f, 0.04f);
+                    main.startSize     = new ParticleSystem.MinMaxCurve(1.4f, 0.55f);
+                    main.startLifetime = new ParticleSystem.MinMaxCurve(7.0f, 3.5f);
+
+                    var shape = ps.shape;
+                    shape.shapeType = ParticleSystemShapeType.Box;
+                    shape.scale     = new Vector3(9.5f, 2.5f, 0.1f);
+
+                    var emission = ps.emission;
+                    emission.rateOverTime = 120f;
+
+                    EditorUtility.SetDirty(ps);
+                    Debug.Log("[VisualMatch] Magenta Plasma Dust: Box emitter at Y=-5, size 1.4, speed 0.18");
+                }
+            }
+
+            // 3. Ring: reduce ColorB.R to match ref R/B = 0.22
+            // Curr right BGR=[126,0,48] vs Ref=[126,0,28] → scale R by 28/48=0.58
+            // ColorB.R: 0.45 * 0.58 = 0.26
+            Material ring = LoadMat(RingMatPath);
+            if (ring != null)
+            {
+                ring.SetColor("_ColorA", new Color(0.0f, 0.0f, 6.5f, 1f));
+                ring.SetColor("_ColorB", new Color(0.26f, 0.0f, 5.5f, 1f));
+                ring.SetFloat("_Intensity", 1.25f);
+                ring.SetFloat("_SegmentContrast", 0.20f);
+                EditorUtility.SetDirty(ring);
+            }
+
+            // Ring scale: bump 2.7% to close r_norm gap (0.339 → target 0.348)
+            GameObject ringObj = GameObject.Find("HDR Energy Ring");
+            if (ringObj != null)
+            {
+                ringObj.transform.localScale = new Vector3(1.028f, 1.028f, 1f);
+                EditorUtility.SetDirty(ringObj);
+            }
+
+            // 4. Carry forward best baseline settings
+            Material mist = LoadMat(MistMatPath);
+            if (mist != null)
+            {
+                mist.SetColor("_Color", new Color(0.22f, 0.0f, 1.0f, 0.40f));
+                mist.SetFloat("_Intensity", 0.22f);
+                EditorUtility.SetDirty(mist);
+            }
+
+            GameObject horizonGlow = GameObject.Find("Low Horizon Glow");
+            if (horizonGlow != null)
+            {
+                horizonGlow.transform.localPosition = new Vector3(0f, -5.0f, 0.5f);
+                horizonGlow.transform.localScale    = new Vector3(14f, 4f, 1f);
+                EditorUtility.SetDirty(horizonGlow);
+            }
+
+            RebuildVolumeProfile(
+                bloomIntensity:  0.68f,
+                bloomThreshold:  0.55f,
+                bloomScatter:    0.50f,
+                postExposure:   -0.32f,
+                contrast:        25f,
+                saturation:      14f,
+                colorFilter:     new Color(0.78f, 0.84f, 1.0f));
+            FixPostProcessController(0.68f, 0.20f);
+
+            Material water = LoadMat(WaterMatPath);
+            if (water != null)
+            {
+                water.SetFloat("_Intensity", 0.80f);
+                water.SetFloat("_Width", 0.14f);
+                EditorUtility.SetDirty(water);
+            }
+
+            GameObject mountain = GameObject.Find("Dark Mountain Silhouettes");
+            if (mountain != null)
+            {
+                mountain.transform.localScale    = new Vector3(10f, 2.5f, 1f);
+                mountain.transform.localPosition = new Vector3(0f, -6.2f, 0.1f);
+                EditorUtility.SetDirty(mountain);
+            }
+
+            // Star dust size fix (from Iter019)
+            GameObject starDust = GameObject.Find("Star Dust Field");
+            if (starDust != null)
+            {
+                ParticleSystem ps = starDust.GetComponent<ParticleSystem>();
+                if (ps != null)
+                {
+                    var main = ps.main;
+                    main.startSize = new ParticleSystem.MinMaxCurve(0.048f, 0.018f);
+                    EditorUtility.SetDirty(ps);
+                }
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 020: radial shafts enabled, plasma clouds at bottom, ring ColorB.R=0.26.");
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // Iteration 019 – Fix Star Dust particle size (was sub-pixel 0.006)
+        // ────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 019 – Fix Star Size")]
+        public static void Iteration019()
+        {
+            LoadScene();
+
+            // Ring: exact Iter012 settings (best SSIM baseline)
+            Material ring = LoadMat(RingMatPath);
+            if (ring != null)
+            {
+                ring.SetColor("_ColorA", new Color(0.0f, 0.0f, 6.5f, 1f));
+                ring.SetColor("_ColorB", new Color(0.45f, 0.0f, 5.5f, 1f));
+                ring.SetFloat("_Intensity", 1.25f);
+                ring.SetFloat("_SegmentContrast", 0.20f);
+                EditorUtility.SetDirty(ring);
+            }
+
+            // Mist + horizon: exact Iter012 settings
+            Material mist = LoadMat(MistMatPath);
+            if (mist != null)
+            {
+                mist.SetColor("_Color", new Color(0.22f, 0.0f, 1.0f, 0.40f));
+                mist.SetFloat("_Intensity", 0.22f);
+                EditorUtility.SetDirty(mist);
+            }
+
+            GameObject horizonGlow = GameObject.Find("Low Horizon Glow");
+            if (horizonGlow != null)
+            {
+                horizonGlow.transform.localPosition = new Vector3(0f, -5.0f, 0.5f);
+                horizonGlow.transform.localScale    = new Vector3(14f, 4f, 1f);
+                EditorUtility.SetDirty(horizonGlow);
+            }
+
+            // Star Dust Field: increase particle size from 0.006 (sub-pixel) to 0.045
+            // Reference has visible star dots: ~2-3 pixels = 3/62.9 pix/unit ≈ 0.048 world units
+            // Current size 0.006 → 0.38 pixel = INVISIBLE
+            GameObject starDust = GameObject.Find("Star Dust Field");
+            if (starDust != null)
+            {
+                ParticleSystem ps = starDust.GetComponent<ParticleSystem>();
+                if (ps != null)
+                {
+                    var main = ps.main;
+                    main.startSize = new ParticleSystem.MinMaxCurve(0.048f, 0.018f);
+                    EditorUtility.SetDirty(ps);
+                    Debug.Log("[VisualMatch] Star Dust Field: startSize 0.006→0.048");
+                }
+            }
+
+            // Magenta Plasma Dust: also likely too small, boost it
+            GameObject plasmaDust = GameObject.Find("Magenta Plasma Dust");
+            if (plasmaDust != null)
+            {
+                ParticleSystem ps = plasmaDust.GetComponent<ParticleSystem>();
+                if (ps != null)
+                {
+                    var main = ps.main;
+                    main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.025f);
+                    EditorUtility.SetDirty(ps);
+                }
+            }
+
+            // Post-processing: exact Iter012 settings
+            RebuildVolumeProfile(
+                bloomIntensity:  0.68f,
+                bloomThreshold:  0.55f,
+                bloomScatter:    0.50f,
+                postExposure:   -0.32f,
+                contrast:        25f,
+                saturation:      14f,
+                colorFilter:     new Color(0.78f, 0.84f, 1.0f));
+            FixPostProcessController(0.68f, 0.20f);
+
+            GameObject bg = GameObject.Find("Blue Violet Background Glow");
+            if (bg != null)
+            {
+                Renderer bgRend = bg.GetComponent<Renderer>();
+                if (bgRend != null)
+                {
+                    bgRend.sharedMaterial.SetColor("_Color", new Color(0.15f, 0.0f, 0.80f, 0.35f));
+                    bgRend.sharedMaterial.SetFloat("_Intensity", 0.09f);
+                    EditorUtility.SetDirty(bgRend.sharedMaterial);
+                }
+            }
+
+            Material water = LoadMat(WaterMatPath);
+            if (water != null)
+            {
+                water.SetFloat("_Intensity", 0.80f);
+                water.SetFloat("_Width", 0.14f);
+                EditorUtility.SetDirty(water);
+            }
+
+            GameObject mountain = GameObject.Find("Dark Mountain Silhouettes");
+            if (mountain != null)
+            {
+                mountain.transform.localScale    = new Vector3(10f, 2.5f, 1f);
+                mountain.transform.localPosition = new Vector3(0f, -6.2f, 0.1f);
+                EditorUtility.SetDirty(mountain);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 019: star dust size fixed 0.006→0.048.");
+        }
+
         // ═══════════════════════════════════════════════════════════════
         //  Private helpers
         // ═══════════════════════════════════════════════════════════════

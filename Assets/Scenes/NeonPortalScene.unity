@@ -306,8 +306,8 @@ ParticleSystem:
     startLifetime:
       serializedVersion: 2
       minMaxState: 3
-      scalar: 3.6
-      minScalar: 1.1
+      scalar: 3.5
+      minScalar: 7
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -359,8 +359,8 @@ ParticleSystem:
     startSpeed:
       serializedVersion: 2
       minMaxState: 3
-      scalar: 3.1
-      minScalar: 1.0849999
+      scalar: 0.04
+      minScalar: 0.18
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -477,8 +477,8 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 3
-      scalar: 0.026
-      minScalar: 0.0091
+      scalar: 0.55
+      minScalar: 1.4
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -854,7 +854,7 @@ ParticleSystem:
   ShapeModule:
     serializedVersion: 6
     enabled: 1
-    type: 10
+    type: 5
     angle: 25
     length: 5
     boxThickness: {x: 0, y: 0, z: 0}
@@ -862,7 +862,7 @@ ParticleSystem:
     donutRadius: 0.2
     m_Position: {x: 0, y: 0, z: 0}
     m_Rotation: {x: 0, y: 0, z: 0}
-    m_Scale: {x: 7.4, y: 7.4, z: 1}
+    m_Scale: {x: 9.5, y: 2.5, z: 0.1}
     placementMode: 0
     m_MeshMaterialIndex: 0
     m_MeshNormalOffset: 0
@@ -1060,7 +1060,7 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 460
+      scalar: 120
       minScalar: 10
       maxCurve:
         serializedVersion: 2
@@ -5029,7 +5029,7 @@ Transform:
   m_GameObject: {fileID: 203756933}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.25, z: -0.18}
+  m_LocalPosition: {x: 0, y: -5, z: -0.3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -5828,7 +5828,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &550662503
 Transform:
   m_ObjectHideFlags: 0
@@ -12599,8 +12599,8 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 3
-      scalar: 0.006
-      minScalar: 0.0021
+      scalar: 0.018
+      minScalar: 0.048
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -17794,7 +17794,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0.7071068, w: 0.7071068}
   m_LocalPosition: {x: 0.12, y: -0.43, z: -0.6}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.028, y: 1.028, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 462644311}
