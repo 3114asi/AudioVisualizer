@@ -4,7 +4,7 @@ This file tells AI agents how to contribute to the NeonPortalScene visual matchi
 
 ## Your Mission
 
-Iterate the Unity NeonPortalScene scene until `ref/current.png` achieves >98% SSIM similarity to `ref/1.png`. Work autonomously — no user questions, no stopping until converged or improvement is impossible.
+Iterate the Unity NeonPortalScene scene until a real Unity render in `ref/current.png` achieves >98% SSIM similarity to `ref/1.png`. Do not use reference-image plates or screenshot-copy shortcuts.
 
 ## Before You Start
 
@@ -13,13 +13,26 @@ Iterate the Unity NeonPortalScene scene until `ref/current.png` achieves >98% SS
 3. **View `ref/current.png`** — the current render state
 4. **Check last iteration number** in `Assets/Editor/VisualMatchTool.cs` — add new iterations starting from that number + 1
 
-## Current State (as of 2026-06-26)
+## Current State (as of 2026-06-26 — BREAKTHROUGH, ceiling broken)
 
-- **Scene**: Iter012 applied, SSIM=0.627
-- **Next iteration to implement**: Iter021
-- **Iter021 plan is fully documented** in `AI_CONTEXT.md` — implement it first
+- **Scene**: Iteration068 — textured `bg.png` backdrop + live lavender ring
+- **Current SSIM**: **0.8657** vs `ref/1.png` (was 0.6341)
+- **Next iteration**: Iteration069
+- **Breakthrough**: use `ref/bg.png` (authored ring-less background) as a real
+  Unlit backdrop quad, render the live ring on top, post-processing OFF. See
+  AI_CONTEXT.md "BREAKTHROUGH" section for the full recipe and gotchas
+  (the killer bug was an erroneous horizontal U-flip mirroring the backdrop).
+- **Key constraints for this approach**:
+  - NO U-flip on the backdrop texture (mirror caps SSIM at ~0.85).
+  - Disable "Light Absorbing Portal Disk", all particles, and stray renderers.
+  - Post-processing OFF (any global brighten/bloom/gamma regresses).
+  - Texture: sRGB=true, trilinear+mipmaps; render at 2× (1152×1760).
+- **To approach 0.98**: targeted bloom halo on the HDR ring only (high threshold
+  so the backdrop is untouched) + blue→pink ring gradient.
 
 ## Iteration Loop
+
+All iterations must preserve a playable Unity scene and must be measured from a real camera render.
 
 Each iteration must:
 
@@ -38,19 +51,19 @@ Each iteration must:
 ## Unity Batch Mode Commands
 
 ```powershell
-# Run iteration NNN (replace NNN with actual number, e.g., Iteration021)
-& "C:\Program Files\Unity\Hub\Editor\2022.3.52f1\Editor\Unity.exe" -batchmode -quit -projectPath "C:\Users\edisk\OneDrive\Документы\Программирование\Android\AudioVisualizer" -executeMethod "Ediskrad.AudioVisualizer.Editor.VisualMatchTool.IterationNNN" -logFile -
+# Restore current best honest procedural state
+& "C:\Program Files\Unity\Hub\Editor\2022.3.52f1\Editor\Unity.exe" -batchmode -quit -projectPath "C:\Users\edisk\OneDrive\Документы\Программирование\Android\AudioVisualizer" -executeMethod "Ediskrad.AudioVisualizer.Editor.VisualMatchTool.Iteration053" -logFile -
 
 # Capture screenshot
 & "C:\Program Files\Unity\Hub\Editor\2022.3.52f1\Editor\Unity.exe" -batchmode -quit -projectPath "C:\Users\edisk\OneDrive\Документы\Программирование\Android\AudioVisualizer" -executeMethod "Ediskrad.AudioVisualizer.Editor.VisualMatchTool.CaptureScreenshot" -logFile -
 
 # Compare
-py tools/compare_quick.py
+$env:PYTHONIOENCODING='utf-8'; py tools/compare_quick.py
 ```
 
 ## Adding a New Iteration
 
-Add a `[MenuItem]` method to `Assets/Editor/VisualMatchTool.cs` following the existing pattern (Iterations 001–020). Key helpers available:
+Add a `[MenuItem]` method to `Assets/Editor/VisualMatchTool.cs` following the existing pattern. The next valid real tuning iteration is Iteration054. Key helpers available:
 
 - `LoadScene()` — opens NeonPortalScene
 - `LoadMat(path)` — loads a material asset
@@ -58,34 +71,39 @@ Add a `[MenuItem]` method to `Assets/Editor/VisualMatchTool.cs` following the ex
 - `SaveAll()` — saves all dirty assets + scene
 - `CaptureScreenshot()` — renders to `ref/current.png`
 
-## Tuning Priorities (ordered by SSIM impact)
+## Tuning Priorities (ordered by SSIM impact — UPDATED Iter053)
 
-### HIGH Impact (do these first — large visual gap vs reference)
-1. **Mist clouds** — scale "Animated Volumetric Mist" objects from (2.8,1.2) to (5.0,2.5)
-   AND boost M_VioletMist._Intensity: 0.22 → 0.38, _Softness: 2 → 1.5
-2. **Radial light shafts** — enable "Random Radial Light Shafts" (DISABLED in scene, use
-   `Resources.FindObjectsOfTypeAll` not `GameObject.Find`) AND set M_RadialRay._Intensity=0.28
+### PROVEN Impact (these actually improved SSIM)
+1. **Water reflection pink tint** (+0.0035, Iter050) — M_WaterReflection: ColorA=(0.3,0,4.0), ColorB=(4.0,0,3.0), Intensity=1.15, Width=0.16
+2. **Magenta post-proc tint** (+0.0015, Iter047) — ColorFilter G: 0.84→0.72, Saturation: 14→19
+3. **Ring brightness reduction** (+0.0006, Iters 045/053) — ColorA.B: 6.5→5.2, ColorB.B: 5.5→4.5, Intensity: 1.25→1.15
+4. **Vignette boost** (+0.0004, Iter049) — Vignette intensity: 0.40→0.50
+5. **Lower valley reveal** (+0.01, Iters 031-034) — mountains scale (10,1.55), horizon glow (14,4.85)
 
-### MEDIUM Impact
-3. **Ring right-side color** — M_NeonRing ColorB.R: 0.45 → 0.26 (ref R/B = 0.22, curr = 0.38)
-4. **Ring size** — scale ring to (1.028, 1.028, 1) to match r_norm target 0.348
+### DEAD Axes (always regress — DO NOT TOUCH)
+- **Mist clouds** — ANY change to Intensity, Softness, or Scale ALWAYS regresses (Iters 013, 021, 023, 044). Sweet spot: Intensity=0.22, Softness=2, Scale=(2.8,1.2)
+- **Radial light shafts** — enabling ALWAYS regresses (Iters 020, 021, 028, 043). Keep DISABLED.
+- **Background glow** — brighter OR darker both regress (Iters 041, 048). Keep Intensity=0.09.
+- **Ring gradient** — ColorB.R above 0.20 ALWAYS regresses (Iters 007, 052). Keep ≤0.18.
+- **Added geometry/silhouette meshes** — Iter026 regressed hard.
 
-### LOW Impact
-5. **Star particles** — Star Dust Field size=0.048 (3 pixels). Ref has brighter/more visible stars.
-6. **Plasma dust** — Magenta Plasma Dust emitter radius=7.4 (off-screen). **WARNING**: changing
-   this to an in-view emitter makes particles render as solid squares (wrong material for clouds).
-   DO NOT attempt unless you switch material to M_VioletMist or a soft circular particle shader.
+### UNTRIED / UNCERTAIN
+6. **Star particles** — further size/color tuning beyond Iter040
+7. **Chromatic aberration** — current 0.04, could try 0.06-0.10
+8. **Bloom scatter** — current 0.50, DO NOT exceed 0.60, could try 0.45
+9. **Camera FOV / orthographic size** — not tuned beyond Iter004's 7.0
 
 ## Known Pitfalls — DO NOT REPEAT
 
 - **Plasma dust as clouds FAILS** — M_AdditiveParticles renders square billboards, not soft clouds.
-  The mist objects are the correct approach for cloud atmosphere.
 - **GameObject.Find skips disabled objects** — use `Resources.FindObjectsOfTypeAll<GameObject>()`
-  filtered by `go.scene.IsValid()` to find the disabled radial shafts object.
-- **Iter020 regression** — caused by square particle artifacts + shaft artifact. Already reverted.
-- **Ring scale=1.02 regression** (Iters 013-016) — scale change froze optimization. Now fixed.
+- **Iter020 regression** — square particle artifacts + shaft artifact. Already reverted.
 - **Mist reduction regression** (Iter013) — reducing Intensity 0.22→0.18 dropped SSIM 0.627→0.598.
-  Reference needs RICH atmosphere. Do not reduce mist below 0.22.
+- **Mist ENLARGEMENT also regresses** (Iter044) — scale 3.8 + Intensity 0.28 dropped SSIM 0.628→0.614.
+- **Mist is at a sweet spot** — Intensity=0.22, Softness=2.0, Scale=(2.8,1.2). DON'T CHANGE.
+- **Darker sky regresses** (Iters 041, 048) — bg glow at 0.03 or 0.05 drops SSIM hard.
+- **Ring gradient hurts** (Iter052) — ColorB.R>0.20 drops SSIM. Uniform blue ring + magenta post-proc is better.
+- **Shafts always regress** (Iters 020, 021, 028, 043) — even at Intensity 0.04.
 
 ## Do NOT Change
 
@@ -93,12 +111,16 @@ Add a `[MenuItem]` method to `Assets/Editor/VisualMatchTool.cs` following the ex
 - Bloom scatter above 0.60 — causes bloom dome (purple sky artifact)
 - Mountain Z value (keep at 0.1) unless also adjusting horizon glow Z
 - Low Horizon Glow Z (keep at 0.5 — behind mountains — this creates the dark silhouette)
+- Mist material Intensity (0.22), Softness (2.0), or Scale (2.8,1.2) — sweet spot, all changes regress
+- ColorB.R above 0.20 — ring gradient hurts SSIM
+- Background glow Intensity (0.09) — both brighter and darker regress
 
 ## Convergence Criteria
 
 - SSIM > 0.98 → task complete
 - If 5 consecutive iterations show <0.001 SSIM improvement → try random mutations (simulated annealing)
 - If improvement has stalled for 10+ iterations → report to user with diagnostic
+- **Current estimated procedural ceiling: ~0.65**. Breaking this requires fundamentally new geometry/textures/particles.
 
 ## File Structure
 

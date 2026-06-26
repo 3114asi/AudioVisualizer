@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: M_WaterReflection
-  m_Shader: {fileID: 4800000, guid: 2c78b86fbac3c934e8894ad93591ef5e, type: 3}
+  m_Name: M_TopDarkGradient
+  m_Shader: {fileID: 4800000, guid: eaaf6350446a51a4198d9d7bf5e9686c, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -25,10 +25,8 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Intensity: 1.15
-    - _Ripple: 0
-    - _Width: 0.16
+    - _GradientPower: 2.2
+    - _GradientStart: 0.42
     m_Colors:
-    - _ColorA: {r: 0.3, g: 0, b: 4, a: 1}
-    - _ColorB: {r: 4, g: 0, b: 3, a: 1}
+    - _Color: {r: 0.004, g: 0.003, b: 0.018, a: 1}
   m_BuildTextureStacks: []
