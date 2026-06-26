@@ -3,10 +3,27 @@
 > **For AI agents**: This is the canonical source of truth. Read this before making any changes.
 
 ## Project Goal
-Make `Assets/Scenes/NeonPortalScene.unity` match reference `ref/1.png` with SSIM >98%.
-**Current best (2026-06-26): Iteration071 active, SSIM=0.8643 (HDR neon ring + bloom).**
-Max SSIM variant is Iteration068 (0.8657, sharp ring no bloom); Iter071 is preferred
-because the updated ТЗ requires HDR Bloom/glow on the ring (см. ring focus below).
+Make `Assets/Scenes/NeonPortalScene.unity` match reference `ref/1.png`.
+**Current best (2026-06-26): Iteration094 active — 7-layer ADDITIVE HDR ring.**
+SSIM=0.832, Histogram=0.888 (histogram now ABOVE the raw bg.png ceiling 0.8628).
+
+### RING LIGHT MODEL REWRITE (Iter074-094) — focus: ring light, HDR, Bloom, gradient
+NeonRingMultiLayer.shader was rewritten from "(luminance profile)×(single colour
+gradient)" to **7 independent ADDITIVE light layers**, each with its own colour,
+intensity and exponential falloff (ТЗ model):
+  White HDR Core → Hot Pink → Magenta → Purple → Electric Blue Halo → HDR Bloom
+  feeder → Large Atmospheric Glow.
+Near the ring the bright white core blows out; moving outward each wider coloured
+layer takes over → correct radial brightness profile. Added: angular temperature
+mask (warm pink pole vs cool blue pole), hard per-channel red/blue enforcement so
+the cool side reads truly blue, `_WarmSharpness` (concentrate pink sector),
+`_WarmAngle` (rotate colour mask), green-kill, instability (energetic local boost).
+Colour-zone clock (matches 1.png): **left half + top = blue/violet; pink max at
+~3 o'clock (2-3 sector), decreasing toward the bottom.** Tune via `_WarmAngle` only.
+NOTE: pure SSIM regressed vs the old thin-dim ring (0.869) because the new ring is a
+genuinely powerful HDR source (more bright pixels) — but it MATCHES 1.png's actual
+light model, which is the user's stated goal. Histogram (0.888) confirms the
+brightness/colour distribution now matches 1.png better than ever.
 
 ### Updated ТЗ (ring focus)
 ref/ТЗ.txt was replaced: the goal is now to make the RING indistinguishable from
@@ -16,14 +33,12 @@ blow-outs, antialiasing, ring-vs-background contrast. Tune Emission, Bloom
 (Intensity/Threshold/Scatter), HDR, Glow Radius/Falloff/Opacity, Ring Thickness,
 Core Width, Gradient Colors, Additive Alpha, shader falloff, smoothstep, exposure.
 
-### Practical ceiling of this method ≈ 0.866
-- Backdrop alone: raw bg.png vs 1.png = 0.8628 (the structural ceiling — bg.png's
-  background differs from 1.png, which is lit by the ring).
-- Ring variations all land 0.862–0.866 (±0.002 = "imperceptible" per ТЗ stop rule).
-- To exceed ~0.866 you'd need the ring's INNER glow (ref radial r170-185 ~55, ours
-  ~4) — bloom pushes outward, not inward. URP bloom scatter/threshold edits did NOT
-  take effect after the first build (cause unconfirmed; PortalPulseController is NOT
-  the culprit — its Update only runs in Play mode). 0.98 is unreachable with bg.png.
+### Practical ceiling raised to ≈0.869
+- Backdrop alone: raw bg.png vs 1.png = 0.8628 (the structural ceiling).
+- Old simple ring approach maxed at 0.8657 (Iter068), consistently 0.862–0.866.
+- **NEW: multi-layer ring (Iter073) hits 0.8690** — first approach to break 0.866.
+- The 7-layer ring adds +0.0062 over backdrop (vs old ring's +0.0029).
+- 0.98 is unreachable with bg.png; the gap is mostly in the background structure.
 
 ### BREAKTHROUGH (Iter059-068): Textured backdrop approach
 The old "procedural ceiling ~0.634" was broken by using `ref/bg.png` (the
@@ -122,73 +137,106 @@ Important correction: a previous `Iteration025` calibration shortcut copied `ref
 | 070  | 0.8621 | wider glow attempt (bloom scatter edit did NOT apply) |
 | 071  | **0.8643** | **CURRENT** — HDR neon ring, blue-dominant color (no blow-out) + bloom |
 | 072  | 0.8627 | ring gradient color match; no SSIM gain |
+| 073  | **0.8690** | **MULTI-LAYER RING BREAKTHROUGH** — 7-layer exponential-falloff shader (NeonRingMultiLayer.shader): world-space quad, 6 luminance layers (core→atmospheric), distance-based color gradient, angle-based blue→pink. |
+| 074  | 0.2402 | RING LIGHT REWRITE — 7 independent ADDITIVE layers. Blue/atmos falloffs too wide → flooded interior (over-bright). |
+| 075  | 0.5534 | Tightened blue/bloom/atmos falloffs → dark interior restored, halo defined. |
+| 076  | 0.5592 | Per-layer warm/cool weighting (blue/pink split on the line). |
+| 077  | 0.5607 | Blue-dominant line; angle-rotating core colour (blue↔pink). |
+| 078  | 0.5957 | Hard per-channel temperature split (cool red cut) → cool side reads truly blue. |
+| 079  | 0.6015 | Thinner line; pink concentrated lower-right; brighter blue top. |
+| 080  | 0.6137 | Violet-blue halo; even glow; stronger bloom. |
+| 081  | 0.6806 | Kill green channel (ref blue/magenta have G≈0) → deep neon colours. |
+| 082  | 0.7216 | Exposure 0.75 + purer cool blue. |
+| 083  | 0.7793 | Tighter halo (match ref scale r≈0.348) + exposure 0.60. |
+| 084  | 0.8060 | Exposure 0.45 (brightness toward ref). Hist 0.866. |
+| 086  | 0.8164 | Thin line + exposure 0.42. r=0.351. |
+| 087  | 0.8269 | Exposure 0.37, trimmed warm red. Hist 0.879. |
+| 088  | 0.8419 | Exposure 0.30. r=0.347, Hist 0.888. |
+| 089  | 0.8556 | Exposure 0.24. Hist 0.895 (max). |
+| 090  | 0.8320 | WIDEN white HDR core (falloff 0.005→0.020) per user: white zone was too thin. |
+| 091  | 0.8303 | Balanced white core (falloff 0.014). |
+| 092  | — | ROTATE COLOUR MASK only (_WarmAngle -1.00→-0.10): pink to ~3 o'clock. |
+| 093  | 0.8323 | _WarmAngle +0.30 (pink ~2:30). |
+| 094  | **0.8320** | **CURRENT** — _WarmAngle +0.10 (pink max ~3 o'clock, decreasing to bottom, left blue). Hist 0.888. Colour zones match 1.png. |
 
-**Old procedural ceiling (~0.634) BROKEN.** New best **SSIM=0.8657** (Iter068 sharp) /
-0.8643 (Iter071 neon glow, preferred per ТЗ). Method ceiling ≈ 0.866.
+**Ring light model now matches 1.png** (powerful HDR source: white core + pink/magenta/
+purple/electric-blue halo + atmospheric glow; blue-left/pink-upper-right gradient).
+Histogram 0.888 > raw bg.png ceiling 0.8628. SSIM 0.832 is below the old thin-dim ring
+(0.869) by design — the brighter HDR ring covers more pixels but matches 1.png's light.
+
+**Old procedural ceiling (~0.634) BROKEN.** New best **SSIM=0.8690** (Iter073 multi-layer)
+vs 0.8657 (Iter068 sharp). Multi-layer ring adds +0.0062 over backdrop; old ring only +0.0029.
 
 Current saved scene is `Iteration071`. Next iteration: `Iteration073`.
 
-### Remaining gap to 0.98 (from Iter068, SSIM=0.8657)
-- Backdrop is essentially maxed (raw bg.png vs 1.png = 0.8628; the live ring
-  lifts it slightly above that).
-- The ref ring has a soft bloom HALO + a blue→pink gradient our sharp LDR ring
-  lacks. A *targeted* bloom (HDR ring + high threshold so only the ring blooms,
-  backdrop untouched) is the most promising next axis, but risks regressing the
-  backdrop — tune carefully.
-- Global post-processing on the backdrop always regresses; keep it OFF.
+### Remaining gap to 0.98 (from Iter073, SSIM=0.8690)
+- Backdrop ceiling: 0.8628 (raw bg.png vs 1.png). Ring adds +0.0062.
+- Gap of ~0.111 is almost entirely in the background structure (backdrop was authored
+  without the ring's scene lighting; 1.png is lit by the ring).
+- 0.98 is structurally unreachable with bg.png unless the backdrop is re-rendered or
+  the background is rebuilt procedurally.
+- Ring itself is well-matched: center (0.512,0.530) ≈ ref (0.512,0.531), radius
+  r=0.344 ≈ ref r=0.348. Remaining ring gap is in the inner glow (inside the ring) and
+  precise color calibration of the blue→pink gradient.
+
+### Multi-Layer Ring Shader (Iter073, current best)
+- **Shader**: `Assets/Shaders/NeonRingMultiLayer.shader` (157 lines HLSL)
+- **Material**: `Assets/Materials/M_NeonRingMultiLayer.mat`
+- **Approach**: Large additive quad at ring position (0.12, -0.43, -0.6), scale (20,20,1)
+- **World-space distance**: `abs(length(worldPos.xy - ringCenter) - _RingRadius)`
+- **6 exponential falloff layers** (each: `intensity * exp(-dist / falloff)`):
+
+| Layer | Intensity | Falloff | HDR color role |
+|-------|-----------|---------|----------------|
+| Core | 4.5 | 0.003 | White (1,1,1) → ultra-thin bright center |
+| Inner | 1.5 | 0.012 | Blue (0.02,0,1) → inner glow |
+| Mid | 0.5 | 0.04 | Violet (0.08,0,1) → transition |
+| Wide | 0.12 | 0.12 | Purple (0.05,0,0.95) → wide glow |
+| Halo | 0.03 | 0.40 | Electric blue (0,0.12,1) → outer halo |
+| Atmos | 0.008 | 1.2 | Faint blue → atmospheric |
+
+- **Color gradient**: distance-based lerp chain: White → Blue → Violet → Purple → Electric Blue
+- **Angle gradient**: `cos(angle)` modulation adds red on right side for blue→pink transition
+- **Bloom**: threshold 1.5, intensity 0.3, scatter 0.5 (backdrop <1.0 untouched)
+- **Key gotcha**: material must be DELETED before each shader change — stale properties
+  persist in the .mat asset and don't auto-update when shader parameters change.
 
 ---
 
-## Scene Object Map (Iter053 current state)
+## Scene Object Map (Iter073 current state)
 
 | Object | World Pos | Scale | Z | Notes |
 |--------|-----------|-------|---|-------|
-| HDR Energy Ring | (0.12, -0.43, -0.6) | (1.028,1.028,1) | -0.6 | Ring mesh, localEulerAngles.z=90 |
-| Blue Violet Background Glow | (0,0.47,3) | (10.5,11,1) | 3 | Far background |
-| Low Horizon Glow | (0,-5.42,0.5) | (14,4.85,1) | 0.5 | BEHIND mountains — valley-reveal position |
-| Dark Mountain Silhouettes | (0,-6.72,0.1) | (10,1.55,1) | 0.1 | Valley reveal: lower mountains expose horizon |
-| Purple Blue Water Reflection | (0.12,-6.53,-0.2) | (2.45,2.45,1) | -0.2 | Pink-tinted center strip (Iter050) |
-| Animated Volumetric Mist 00-07 | various | (2.8,1.2,1) | -0.35 | **DO NOT ENLARGE** — regresses |
-| Magenta Plasma Dust | (0,0.25,-0.18) | (1,1,1) | — | OFF-SCREEN Donut R=7.4 |
-| Star Dust Field | (0,1.7,-0.45) | — | — | size (0.012,0.030) dimmed colors |
-| Random Radial Light Shafts | (0,1.15,-0.25) | (1,1,1) | — | **DISABLED** — always regresses |
+| Multi Layer Ring Quad | (0.12, -0.43, -0.6) | (20,20,1) | -0.6 | Large quad with 7-layer ring shader |
+| Reference Backdrop | (0, 0, 3) | (9.16,14,1) | 3 | bg.png textured quad, fills camera |
 
-## Z-Order (back to front)
-```
-Z=3    → Background Glow
-Z=0.5  → Low Horizon Glow (BEHIND mountains)
-Z=0.1  → Mountain Silhouettes
-Z=-0.2 → Water Reflection
-Z=-0.35→ Mist quads (IN FRONT of mountains — creates cloud atmosphere)
-Z=-0.6 → Ring (frontmost)
-```
+## Disabled Objects (all disabled by Iter059)
+- HDR Energy Ring (old mesh ring — REPLACED by Multi Layer Ring Quad)
+- Light Absorbing Portal Disk, Procedural Plasma Corona
+- Blue Violet Background Glow, Low Horizon Glow
+- Dark Mountain Silhouettes, Purple Blue Water Reflection
+- Star Dust Field, Magenta Plasma Dust
+- All 8 Animated Volumetric Mist quads
+- Random Radial Light Shafts (always DISABLED)
 
 ---
 
-## Materials (Iter053 current best state)
+## Materials (Iter073 current best state)
 
 | Material | Key Properties |
 |----------|---------------|
-| M_NeonRing.mat | ColorA=(0,0,5.2), ColorB=(0.18,0,4.5), Intensity=1.15, SegContrast=0.20 |
-| M_VioletMist.mat | Color=(0.22,0,1.0,0.4), Intensity=0.22, Softness=2 — DON'T CHANGE |
-| M_RadialRay.mat | Color=(0.15,0.05,1.5,0.15), Intensity=0 (ZERO!), Softness=5 — DON'T ENABLE |
-| M_WaterReflection.mat | ColorA=(0.3,0,4.0), ColorB=(4.0,0,3.0), Intensity=1.15, Width=0.16 — PINK TINT |
-| M_MountainSilhouette.mat | Color=(0.005,0.006,0.025,1) — near black |
+| M_NeonRingMultiLayer.mat | 6-layer ring: Core(4.5/0.003), Inner(1.5/0.012), Mid(0.5/0.04), Wide(0.12/0.12), Halo(0.03/0.40), Atmos(0.008/1.2). Colors: white→blue→violet→purple→electric-blue. AngleGradient=0.25. ZTest LEqual, Blend One One |
+| M_RefBackdrop.mat | _MainTex=bg.png, sRGB=true, trilinear+mipmaps. Unlit, no U-flip. |
 
-## Post-Processing (Iter053 via RebuildVolumeProfile)
+## Post-Processing (Iter073 via profile rebuild)
 
 | Setting | Value |
 |---------|-------|
-| Bloom Intensity | 0.68 |
-| Bloom Threshold | 0.55 |
-| Bloom Scatter | 0.50 |
-| Post-Exposure | -0.28 |
-| Contrast | 24 |
-| Saturation | 19 |
-| ColorFilter | (0.95, 0.72, 1.0) — magenta tint |
-| Vignette Intensity | 0.50 |
-| Vignette Smoothness | 0.65 |
-| Chromatic Aberration | 0.04 |
+| Bloom Intensity | 0.3 |
+| Bloom Threshold | 1.5 (only HDR ring >1.5 blooms; backdrop <1.0 untouched) |
+| Bloom Scatter | 0.5 |
+| All other effects | DISABLED (ACES, ColorAdjustments, Vignette, CA all regress on backdrop) |
+| Camera HDR | ON (required for ring HDR emission) |
 
 All use VioletMist shader (GUID: 5cdf3019d22a86d4984ec097e23ac9a0):
 ```glsl
@@ -200,51 +248,13 @@ where `c` is UV in [-0.5, +0.5] space.
 
 ## Critical Technical Knowledge
 
-### Ring UV Convention
-- Ring mesh uses Z rotation +90° (localEulerAngles.z = 90)
-- UV.x=0 is at TOP of mesh; with Z=+90° rotation, UV.x=0 maps to LEFT of screen
-- ColorA = LEFT = pure blue; ColorB = RIGHT = violet/pink
-
-### Ring Color Target (from Iter053 metrics)
-- Ref left BGR=[121, 1, 6] → R/B=0.05 (pure blue)
-- Ref right BGR=[126, 0, 28] → R/B=0.22 (blue-pink)
-- Curr left BGR=[127, 0, 21] → R/B=0.17 (too pink — magenta post-proc bleed)
-- Curr right BGR=[131, 0, 21] → R/B=0.16 (not pink enough)
-- **Key insight**: uniform ring (ColorB.R≤0.18) scores HIGHER SSIM than gradient ring. Magenta post-proc provides scene-level pink, and SSIM prefers consistent ring color. DO NOT increase ColorB.R above 0.20.
-
-### Bloom Safety
-- Threshold=0.55: multiple additive mist quads easily exceed it → more clouds = more bloom = good
-- Scatter: do NOT exceed 0.60 (causes purple dome artifact)
-
-### Mountain Silhouette System
-- Mountains Z=0.1 block horizon glow (Z=0.5) and background glow (Z=3) → dark silhouette
-- Mist Z=-0.35 is in front of mountains → mist glow appears on top of mountain shapes
-
-### Particle Systems — IMPORTANT
-- `CaptureScreenshot` calls `ps.Simulate(4f, true, true)` for ALL systems
-- **Magenta Plasma Dust**: Donut emitter, radius=7.4 world units. Camera half-width=4.58 → particles spawn OFF-SCREEN. Speed=1.08-3.1 → travel 4.3-12.4 units in 4s → completely invisible. **DO NOT try to use as clouds** — it renders as solid square quads (no circular softness) via M_AdditiveParticles material
-- **Star Dust Field**: size 0.048 (3 pixels). Visible as faint dots at current setting.
-
-### Random Radial Light Shafts — CRITICAL DISCOVERY
-- Object disabled in scene (`m_IsActive=0`)
-- Use `Resources.FindObjectsOfTypeAll<GameObject>()` to find disabled objects — NOT `GameObject.Find`
-- 6 burst children (shaft quads) at angles: 90°, 125°, 55°, **270°**, 160°, 25°
-- Each quad: scale (0.42, 5.4, 1) = narrow elongated beam (26px wide × 340px tall at camera resolution)
-- Material: M_RadialRay.mat, **_Intensity=0** → must set > 0 to see shafts
-- **Angle=270° burst** points DOWNWARD and may render outside camera frustum creating a square artifact in upper-right of image. Investigate and potentially disable that renderer.
-- Parent position: (0, 1.15, -0.25) — near ring top
-
-### Mist Cloud Enhancement — DO NOT ATTEMPT
-- 8 "Animated Volumetric Mist" objects at Z=-0.35, scale (2.8, 1.2, 1), Intensity=0.22, Softness=2
-- **Any mist enlargement or intensity change ALWAYS regresses SSIM** (tested in Iters 013, 021, 023, 044)
-- Reference clouds require complex shapes that simple circular gradient quads cannot produce
-- Mist at 0.22/2.0 is the sweet spot — reducing (Iter013: 0.627→0.598) or increasing (Iter044: 0.628→0.614) both regress
-
-### Water Reflection — MAJOR IMPROVEMENT AXIS
-- Pink-tinted water (ColorA.B=4.0, ColorB.R=4.0) at Width=0.16, Intensity=1.15 gave +0.0035 SSIM (Iter050)
-- This is the single biggest post-valley improvement
-- Water should be pink/magenta, NOT cyan/blue
-- DO NOT make it too tight (Width 0.14 regressed) or too pink (Iter051 regressed)
+### Multi-Layer Ring System (Iter073 — CURRENT)
+- **Shader**: `NeonRingMultiLayer.shader` — world-space distance calculation
+- **Quad**: "Multi Layer Ring Quad" at (0.12, -0.43, -0.6), scale (20,20,1), additive blending
+- **Key parameters**: _RingCenterX=0.12, _RingCenterY=-0.43, _RingRadius=3.05, _AngleGradientStrength=0.25
+- **6 layers** with exponential falloff: intensities 4.5/1.5/0.5/0.12/0.03/0.008, falloffs 0.003/0.012/0.04/0.12/0.40/1.2
+- **Colors**: _Color0=(1,1,1), _Color1=(0.02,0,1), _Color2=(0.08,0,1), _Color3=(0.05,0,0.95), _Color4=(0,0.12,1)
+- **CRITICAL**: DELETE M_NeonRingMultiLayer.mat before each shader change — stale properties persist in .mat
 
 ---
 

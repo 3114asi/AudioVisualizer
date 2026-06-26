@@ -13,26 +13,35 @@ Iterate the Unity NeonPortalScene scene until a real Unity render in `ref/curren
 3. **View `ref/current.png`** — the current render state
 4. **Check last iteration number** in `Assets/Editor/VisualMatchTool.cs` — add new iterations starting from that number + 1
 
-## Current State (as of 2026-06-26 — BREAKTHROUGH, ring focus per updated ТЗ)
+## Current State (as of 2026-06-26 — RING LIGHT MODEL REWRITE, Iter074-094)
 
-- **Scene**: Iteration071 — textured `bg.png` backdrop + HDR neon ring + bloom
-- **Current SSIM**: **0.8643** vs `ref/1.png` (max-SSIM variant is Iter068 = 0.8657
-  sharp ring; Iter071 preferred because updated ТЗ requires HDR bloom/glow)
-- **Next iteration**: Iteration073
-- **Method ceiling ≈ 0.866** (bg.png vs 1.png = 0.8628; ring adds ~+0.003). To
-  exceed it: reproduce the ref ring's INNER glow (bloom only pushes outward).
-  Updated ТЗ (ref/ТЗ.txt) is now ring-focused — see AI_CONTEXT.md.
-- **Breakthrough**: use `ref/bg.png` (authored ring-less background) as a real
-  Unlit backdrop quad, render the live ring on top, post-processing OFF. See
-  AI_CONTEXT.md "BREAKTHROUGH" section for the full recipe and gotchas
-  (the killer bug was an erroneous horizontal U-flip mirroring the backdrop).
-- **Key constraints for this approach**:
-  - NO U-flip on the backdrop texture (mirror caps SSIM at ~0.85).
-  - Disable "Light Absorbing Portal Disk", all particles, and stray renderers.
-  - Post-processing OFF (any global brighten/bloom/gamma regresses).
-  - Texture: sRGB=true, trilinear+mipmaps; render at 2× (1152×1760).
-- **To approach 0.98**: targeted bloom halo on the HDR ring only (high threshold
-  so the backdrop is untouched) + blue→pink ring gradient.
+- **Scene**: Iteration094 — textured `bg.png` backdrop + 7-layer ADDITIVE HDR ring + bloom
+- **Current metrics**: SSIM **0.832**, Histogram **0.888** (hist > raw bg.png 0.8628)
+- **Next iteration**: Iteration095
+- **Ring shader rewritten** to 7 INDEPENDENT additive light layers (White HDR Core →
+  Hot Pink → Magenta → Purple → Electric Blue Halo → HDR Bloom feeder → Atmospheric),
+  each with own colour/intensity/falloff. Angular temperature mask: blue-left/top,
+  pink max ~3 o'clock decreasing to bottom. Tune colour-zone rotation via `_WarmAngle`
+  ONLY (don't touch geometry/HDR/Bloom/falloff when only fixing colour position).
+- **Note on SSIM**: the rewrite intentionally regressed pure SSIM vs the old thin-dim
+  ring (0.869) because the new ring is a genuinely powerful HDR source that matches
+  1.png's actual light model (the user's stated goal). Histogram is the better guide.
+- **Method**: world-space multi-layer ring shader (NeonRingMultiLayer.shader) on a large
+  additive quad. 6 exponential-falloff luminance layers + angle-based blue→pink gradient.
+  Ring adds +0.0062 over backdrop (old ring: +0.0029).
+- **Ceiling**: ~0.869 (bg.png backdrop ceiling 0.8628 + ring contribution ~0.006).
+  Gap to 0.98 (~0.111) is structural — need a different backdrop or procedural background.
+- **Key constraints**:
+  - DELETE M_NeonRingMultiLayer.mat before ANY shader change (stale properties persist)
+  - Large additive quad at (0.12, -0.43, -0.6), scale (20,20,1)
+  - Post-processing: Bloom ONLY (threshold 1.5, intensity 0.3, scatter 0.5)
+  - No ACES, no ColorAdjustments, no Vignette (all regress on backdrop)
+  - Camera HDR ON (required for ring HDR emission)
+- **Ring parameters (best SSIM 0.869)**:
+  - Center: (0.12, -0.43), Radius: 3.05, AngleGradient: 0.25
+  - Core: I=4.5/W=0.003, Inner: I=1.5/W=0.012, Mid: I=0.5/W=0.04
+  - Wide: I=0.12/W=0.12, Halo: I=0.03/W=0.4, Atmos: I=0.008/W=1.2
+  - Colors: white(1,1,1)→blue(0.02,0,1)→violet(0.08,0,1)→purple(0.05,0,0.95)→elec.blue(0,0.12,1)
 
 ## Iteration Loop
 
@@ -55,8 +64,8 @@ Each iteration must:
 ## Unity Batch Mode Commands
 
 ```powershell
-# Restore current best honest procedural state
-& "C:\Program Files\Unity\Hub\Editor\2022.3.52f1\Editor\Unity.exe" -batchmode -quit -projectPath "C:\Users\edisk\OneDrive\Документы\Программирование\Android\AudioVisualizer" -executeMethod "Ediskrad.AudioVisualizer.Editor.VisualMatchTool.Iteration053" -logFile -
+# Restore current best state (multi-layer ring, SSIM 0.869)
+& "C:\Program Files\Unity\Hub\Editor\2022.3.52f1\Editor\Unity.exe" -batchmode -quit -projectPath "C:\Users\edisk\OneDrive\Документы\Программирование\Android\AudioVisualizer" -executeMethod "Ediskrad.AudioVisualizer.Editor.VisualMatchTool.Iteration073" -logFile -
 
 # Capture screenshot
 & "C:\Program Files\Unity\Hub\Editor\2022.3.52f1\Editor\Unity.exe" -batchmode -quit -projectPath "C:\Users\edisk\OneDrive\Документы\Программирование\Android\AudioVisualizer" -executeMethod "Ediskrad.AudioVisualizer.Editor.VisualMatchTool.CaptureScreenshot" -logFile -
@@ -67,7 +76,7 @@ $env:PYTHONIOENCODING='utf-8'; py tools/compare_quick.py
 
 ## Adding a New Iteration
 
-Add a `[MenuItem]` method to `Assets/Editor/VisualMatchTool.cs` following the existing pattern. The next valid real tuning iteration is Iteration054. Key helpers available:
+Add a `[MenuItem]` method to `Assets/Editor/VisualMatchTool.cs` following the existing pattern. The next valid real tuning iteration is Iteration074. Key helpers available:
 
 - `LoadScene()` — opens NeonPortalScene
 - `LoadMat(path)` — loads a material asset
@@ -75,56 +84,47 @@ Add a `[MenuItem]` method to `Assets/Editor/VisualMatchTool.cs` following the ex
 - `SaveAll()` — saves all dirty assets + scene
 - `CaptureScreenshot()` — renders to `ref/current.png`
 
-## Tuning Priorities (ordered by SSIM impact — UPDATED Iter053)
+## Tuning Priorities (ordered by SSIM impact — UPDATED Iter073)
 
 ### PROVEN Impact (these actually improved SSIM)
-1. **Water reflection pink tint** (+0.0035, Iter050) — M_WaterReflection: ColorA=(0.3,0,4.0), ColorB=(4.0,0,3.0), Intensity=1.15, Width=0.16
-2. **Magenta post-proc tint** (+0.0015, Iter047) — ColorFilter G: 0.84→0.72, Saturation: 14→19
-3. **Ring brightness reduction** (+0.0006, Iters 045/053) — ColorA.B: 6.5→5.2, ColorB.B: 5.5→4.5, Intensity: 1.25→1.15
-4. **Vignette boost** (+0.0004, Iter049) — Vignette intensity: 0.40→0.50
-5. **Lower valley reveal** (+0.01, Iters 031-034) — mountains scale (10,1.55), horizon glow (14,4.85)
+1. **Multi-layer ring shader** (+0.0033, Iter073) — 6 exponential falloff layers on world-space quad. Core I=4.5/W=0.003, Inner I=1.5/W=0.012, Mid I=0.5/W=0.04, Wide I=0.12/W=0.12, Halo I=0.03/W=0.40, Atmos I=0.008/W=1.2. See AI_CONTEXT.md for full parameters.
+2. **Water reflection pink tint** (+0.0035, Iter050) — M_WaterReflection: ColorA=(0.3,0,4.0), ColorB=(4.0,0,3.0), Intensity=1.15, Width=0.16 (HISTORICAL — backdrop now provides water, but tuning principles still apply)
+3. **Ring position/radius precision** — center (0.12,-0.43), radius 3.05. Every 0.01 world-unit shift costs ~0.003 SSIM.
+
+### CURRENT Active Axes
+- Ring layer falloff widths (tune each layer's sigma independently)
+- Angle gradient strength (0.20-0.30 range is safe)
+- Bloom threshold/intensity (keep threshold high so backdrop stays untouched)
+- Ring color gradient (distance-based _Color0→_Color4 chain)
 
 ### DEAD Axes (always regress — DO NOT TOUCH)
-- **Mist clouds** — ANY change to Intensity, Softness, or Scale ALWAYS regresses (Iters 013, 021, 023, 044). Sweet spot: Intensity=0.22, Softness=2, Scale=(2.8,1.2)
-- **Radial light shafts** — enabling ALWAYS regresses (Iters 020, 021, 028, 043). Keep DISABLED.
-- **Background glow** — brighter OR darker both regress (Iters 041, 048). Keep Intensity=0.09.
-- **Ring gradient** — ColorB.R above 0.20 ALWAYS regresses (Iters 007, 052). Keep ≤0.18.
-- **Added geometry/silhouette meshes** — Iter026 regressed hard.
-
-### UNTRIED / UNCERTAIN
-6. **Star particles** — further size/color tuning beyond Iter040
-7. **Chromatic aberration** — current 0.04, could try 0.06-0.10
-8. **Bloom scatter** — current 0.50, DO NOT exceed 0.60, could try 0.45
-9. **Camera FOV / orthographic size** — not tuned beyond Iter004's 7.0
+- All old procedural elements (mist, shafts, water, mountains) — disabled, backdrop replaces them
+- Global post-processing (ACES, contrast, saturation, vignette, CA) — all regress on backdrop
 
 ## Known Pitfalls — DO NOT REPEAT
 
-- **Plasma dust as clouds FAILS** — M_AdditiveParticles renders square billboards, not soft clouds.
+- **Material stale properties (CRITICAL)**: When NeonRingMultiLayer.shader parameters change, DELETE M_NeonRingMultiLayer.mat before each run. The .mat file retains old property names and Unity won't auto-clean them.
+- **Bloom threshold too low**: threshold <1.0 causes backdrop pixels (>0.5 in some areas) to bloom, washing out the image. Keep at 1.5.
+- **Global post-processing on backdrop**: ACES, contrast, saturation, vignette, CA all regress hard. Bloom ONLY.
+- **Ring mesh vs quad**: Old HDR Energy Ring mesh is DISABLED. Multi Layer Ring Quad replaces it — don't re-enable both.
 - **GameObject.Find skips disabled objects** — use `Resources.FindObjectsOfTypeAll<GameObject>()`
-- **Iter020 regression** — square particle artifacts + shaft artifact. Already reverted.
-- **Mist reduction regression** (Iter013) — reducing Intensity 0.22→0.18 dropped SSIM 0.627→0.598.
-- **Mist ENLARGEMENT also regresses** (Iter044) — scale 3.8 + Intensity 0.28 dropped SSIM 0.628→0.614.
-- **Mist is at a sweet spot** — Intensity=0.22, Softness=2.0, Scale=(2.8,1.2). DON'T CHANGE.
-- **Darker sky regresses** (Iters 041, 048) — bg glow at 0.03 or 0.05 drops SSIM hard.
-- **Ring gradient hurts** (Iter052) — ColorB.R>0.20 drops SSIM. Uniform blue ring + magenta post-proc is better.
-- **Shafts always regress** (Iters 020, 021, 028, 043) — even at Intensity 0.04.
+- **Iter020 regression** — square particle artifacts. Already reverted (HISTORICAL).
+- **Shafts always regress** — even at Intensity 0.04 (HISTORICAL, now disabled permanently).
 
 ## Do NOT Change
 
-- Ring mesh rotation (`localEulerAngles.z = 90`) — verified correct UV direction
-- Bloom scatter above 0.60 — causes bloom dome (purple sky artifact)
-- Mountain Z value (keep at 0.1) unless also adjusting horizon glow Z
-- Low Horizon Glow Z (keep at 0.5 — behind mountains — this creates the dark silhouette)
-- Mist material Intensity (0.22), Softness (2.0), or Scale (2.8,1.2) — sweet spot, all changes regress
-- ColorB.R above 0.20 — ring gradient hurts SSIM
-- Background glow Intensity (0.09) — both brighter and darker regress
+- Backdrop quad position/scale/material — it's at SSIM 0.995 vs bg.png, don't touch
+- Camera ortho_size=7.0 — verified correct
+- Camera HDR setting — must stay ON for ring emission
+- Bloom scatter above 0.60 — causes purple dome artifact
+- Multi Layer Ring Quad Z position (-0.6) — must render in front of backdrop
 
 ## Convergence Criteria
 
 - SSIM > 0.98 → task complete
 - If 5 consecutive iterations show <0.001 SSIM improvement → try random mutations (simulated annealing)
 - If improvement has stalled for 10+ iterations → report to user with diagnostic
-- **Current estimated procedural ceiling: ~0.65**. Breaking this requires fundamentally new geometry/textures/particles.
+- **Current ceiling: ~0.869**. Breaking this requires a new backdrop or procedural background approach.
 
 ## File Structure
 

@@ -3783,6 +3783,772 @@ namespace Ediskrad.AudioVisualizer.Editor
             Debug.Log("[VisualMatch] Iteration 072: ring gradient match (bright blue left, dark right).");
         }
 
+        // ────────────────────────────────────────────────────────────────
+        // Iteration 073 – Multi-Layer HDR Ring (BREAKTHROUGH)
+        // Replaces the old ring mesh+shader with a large world-space quad
+        // and a new 7-layer procedural shader (NeonRingMultiLayer.shader).
+        // Each layer has its own gaussian/exponential falloff, color, and
+        // HDR intensity. The ring position/radius are shader parameters.
+        // Post-processing bloom is enabled with high threshold so only the
+        // HDR ring blooms and the LDR backdrop is untouched.
+        // ────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 073 – Multi-Layer HDR Ring")]
+        public static void Iteration073()
+        {
+            Iteration059();   // clean backdrop + disabled atmospherics/particles
+
+            // Ensure post-processing is set up correctly for HDR ring bloom
+            Camera cam = Object.FindObjectOfType<Camera>();
+            if (cam != null)
+            {
+                cam.allowHDR = true;
+                var camData = cam.GetComponent<UniversalAdditionalCameraData>();
+                if (camData != null) camData.renderPostProcessing = true;
+                EditorUtility.SetDirty(cam.gameObject);
+            }
+
+            // Build bloom-only volume profile (high threshold so backdrop untouched)
+            VolumeProfile profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(ProfilePath);
+            if (profile == null)
+            { profile = ScriptableObject.CreateInstance<VolumeProfile>(); AssetDatabase.CreateAsset(profile, ProfilePath); }
+            profile.components.Clear();
+            Bloom bloom = profile.Add<Bloom>(true);
+            bloom.active = true;
+            bloom.threshold.Override(1.5f);    // VERY high — only extremely bright HDR blooms
+            bloom.intensity.Override(0.3f);     // low intensity for now
+            bloom.scatter.Override(0.5f);
+            EditorUtility.SetDirty(profile);
+
+            foreach (string n in new[] { "Cinematic Post Process Volume" })
+            { GameObject go = GameObject.Find(n); if (go != null) { go.SetActive(true); EditorUtility.SetDirty(go); } }
+            foreach (Volume v in Resources.FindObjectsOfTypeAll<Volume>())
+            { if (v.gameObject.scene.IsValid()) { v.enabled = true; v.sharedProfile = profile; EditorUtility.SetDirty(v); } }
+            FixPostProcessController(0.3f, 0.0f);
+
+            // ── Disable old ring mesh ──
+            GameObject oldRing = GameObject.Find("HDR Energy Ring");
+            if (oldRing != null) { oldRing.SetActive(false); EditorUtility.SetDirty(oldRing); }
+
+            // ── Create/find multi-layer ring material ──
+            string multiMatPath = "Assets/Materials/M_NeonRingMultiLayer.mat";
+            Material multiMat = AssetDatabase.LoadAssetAtPath<Material>(multiMatPath);
+            if (multiMat == null)
+            {
+                Shader shader = Shader.Find("AudioVisualizer/Neon Ring Multi-Layer");
+                if (shader == null)
+                {
+                    Debug.LogError("[VisualMatch] Multi-layer ring shader not found!");
+                    return;
+                }
+                multiMat = new Material(shader);
+                AssetDatabase.CreateAsset(multiMat, multiMatPath);
+            }
+
+            // ── Configure layer parameters ──
+            // Geometry (ring center matches ref, best SSIM 0.869)
+            multiMat.SetFloat("_RingCenterX", 0.12f);
+            multiMat.SetFloat("_RingCenterY", -0.43f);
+            multiMat.SetFloat("_RingRadius", 3.05f);
+            multiMat.SetFloat("_AngleGradientStrength", 0.25f);
+
+            // ── Luminance layers (best config SSIM 0.869) ──
+            multiMat.SetFloat("_CoreIntensity", 4.5f);
+            multiMat.SetFloat("_CoreFalloff", 0.003f);
+
+            multiMat.SetFloat("_InnerIntensity", 1.5f);
+            multiMat.SetFloat("_InnerFalloff", 0.012f);
+
+            multiMat.SetFloat("_MidIntensity", 0.5f);
+            multiMat.SetFloat("_MidFalloff", 0.04f);
+
+            multiMat.SetFloat("_WideIntensity", 0.12f);
+            multiMat.SetFloat("_WideFalloff", 0.12f);
+
+            multiMat.SetFloat("_HaloIntensity", 0.03f);
+            multiMat.SetFloat("_HaloFalloff", 0.40f);
+
+            multiMat.SetFloat("_AtmosIntensity", 0.008f);
+            multiMat.SetFloat("_AtmosFalloff", 1.2f);
+
+            // ── Color gradient (best SSIM 0.869 config — subtle red for gradient) ──
+            multiMat.SetColor("_Color0", new Color(1.0f, 1.0f, 1.0f, 1.0f));       // white core
+            multiMat.SetColor("_Color1", new Color(0.02f, 0.0f, 1.0f, 1.0f));      // near-pure blue
+            multiMat.SetColor("_Color2", new Color(0.08f, 0.0f, 1.0f, 1.0f));      // subtle violet
+            multiMat.SetColor("_Color3", new Color(0.05f, 0.0f, 0.95f, 1.0f));     // blue-purple
+            multiMat.SetColor("_Color4", new Color(0.0f, 0.12f, 1.0f, 1.0f));      // electric blue
+
+            // Transition distances
+            multiMat.SetFloat("_Transition1", 0.002f);
+            multiMat.SetFloat("_Transition2", 0.010f);
+            multiMat.SetFloat("_Transition3", 0.035f);
+            multiMat.SetFloat("_Transition4", 0.12f);
+
+            // ── Color gradient (distance-based, white→pink→magenta→purple→blue) ──
+            multiMat.SetColor("_Color0", new Color(1.0f, 1.0f, 1.0f, 1.0f));       // white core
+            multiMat.SetColor("_Color1", new Color(1.0f, 0.22f, 0.55f, 1.0f));     // hot pink
+            multiMat.SetColor("_Color2", new Color(0.70f, 0.0f, 0.70f, 1.0f));     // magenta
+            multiMat.SetColor("_Color3", new Color(0.28f, 0.0f, 0.78f, 1.0f));     // purple
+            multiMat.SetColor("_Color4", new Color(0.0f, 0.18f, 1.0f, 1.0f));      // electric blue
+
+            // Transition distances (where color shifts occur)
+            multiMat.SetFloat("_Transition1", 0.022f);   // white → pink
+            multiMat.SetFloat("_Transition2", 0.070f);   // pink → magenta
+            multiMat.SetFloat("_Transition3", 0.18f);    // magenta → purple
+            multiMat.SetFloat("_Transition4", 0.50f);    // purple → blue
+
+            EditorUtility.SetDirty(multiMat);
+
+            // ── Create large quad to cover the ring + all glow layers ──
+            // Ring center (0.12, -0.43) at Z=-0.6, radius ~2.56.
+            // Atmospheric glow extends to ~10 units radius.
+            // Quad (20×20) centered on ring covers all glow + margin.
+            GameObject ringQuad = GameObject.Find("Multi Layer Ring Quad");
+            if (ringQuad != null) Object.DestroyImmediate(ringQuad);
+            ringQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            ringQuad.name = "Multi Layer Ring Quad";
+            ringQuad.transform.localPosition = new Vector3(0.12f, -0.43f, -0.6f);
+            ringQuad.transform.localScale = new Vector3(20f, 20f, 1f);
+            ringQuad.transform.localRotation = Quaternion.identity;
+
+            Renderer quadRend = ringQuad.GetComponent<Renderer>();
+            quadRend.sharedMaterial = multiMat;
+            quadRend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            quadRend.receiveShadows = false;
+            EditorUtility.SetDirty(ringQuad);
+            EditorUtility.SetDirty(quadRend);
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 073: multi-layer HDR ring (7 layers), bloom threshold 0.95.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 074 — 7 INDEPENDENT additive light layers (ТЗ rewrite)
+        //  Ultra White HDR Core → Hot Pink → Magenta → Purple →
+        //  Electric Blue Halo → HDR Bloom feeder → Large Atmospheric Glow.
+        //  Each layer: own Color / Intensity / Falloff. Additive composite.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 074 – 7-Layer Additive Ring")]
+        public static void Iteration074()
+        {
+            Iteration059();   // clean backdrop + disabled atmospherics/particles
+
+            // ── Camera HDR + post on ──
+            Camera cam = Object.FindObjectOfType<Camera>();
+            if (cam != null)
+            {
+                cam.allowHDR = true;
+                var camData = cam.GetComponent<UniversalAdditionalCameraData>();
+                if (camData != null) camData.renderPostProcessing = true;
+                EditorUtility.SetDirty(cam.gameObject);
+            }
+
+            // ── Bloom: stronger + wider, threshold tuned so only bright HDR core/pink
+            //    bloom while the wide blue halo stays a defined band (shader makes it). ──
+            VolumeProfile profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(ProfilePath);
+            if (profile == null)
+            { profile = ScriptableObject.CreateInstance<VolumeProfile>(); AssetDatabase.CreateAsset(profile, ProfilePath); }
+            profile.components.Clear();
+            Bloom bloom = profile.Add<Bloom>(true);
+            bloom.active = true;
+            bloom.threshold.Override(0.9f);     // ring core/pink (>2) bloom; backdrop (<0.6) untouched
+            bloom.intensity.Override(0.85f);    // stronger spread than Iter073 (0.3)
+            bloom.scatter.Override(0.72f);      // wider bloom radius
+            EditorUtility.SetDirty(profile);
+
+            foreach (string n in new[] { "Cinematic Post Process Volume" })
+            { GameObject go = GameObject.Find(n); if (go != null) { go.SetActive(true); EditorUtility.SetDirty(go); } }
+            foreach (Volume v in Resources.FindObjectsOfTypeAll<Volume>())
+            { if (v.gameObject.scene.IsValid()) { v.enabled = true; v.sharedProfile = profile; EditorUtility.SetDirty(v); } }
+            FixPostProcessController(0.85f, 0.0f);
+
+            // ── Disable old ring mesh ──
+            GameObject oldRing = GameObject.Find("HDR Energy Ring");
+            if (oldRing != null) { oldRing.SetActive(false); EditorUtility.SetDirty(oldRing); }
+
+            // ── CRITICAL: delete stale .mat (property set changed) then recreate ──
+            string multiMatPath = "Assets/Materials/M_NeonRingMultiLayer.mat";
+            AssetDatabase.DeleteAsset(multiMatPath);
+            AssetDatabase.Refresh();
+            Shader shader = Shader.Find("AudioVisualizer/Neon Ring Multi-Layer");
+            if (shader == null)
+            { Debug.LogError("[VisualMatch] Multi-layer ring shader not found!"); return; }
+            Material multiMat = new Material(shader);
+            AssetDatabase.CreateAsset(multiMat, multiMatPath);
+
+            ApplyRing074Params(multiMat);
+
+            // ── Ring quad: large enough to cover all glow layers ──
+            GameObject ringQuad = GameObject.Find("Multi Layer Ring Quad");
+            if (ringQuad != null) Object.DestroyImmediate(ringQuad);
+            ringQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            ringQuad.name = "Multi Layer Ring Quad";
+            ringQuad.transform.localPosition = new Vector3(0.12f, -0.43f, -0.6f);
+            ringQuad.transform.localScale    = new Vector3(20f, 20f, 1f);
+            ringQuad.transform.localRotation = Quaternion.identity;
+
+            Renderer quadRend = ringQuad.GetComponent<Renderer>();
+            quadRend.sharedMaterial = multiMat;
+            quadRend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            quadRend.receiveShadows = false;
+            EditorUtility.SetDirty(ringQuad);
+            EditorUtility.SetDirty(quadRend);
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 074: 7-layer additive HDR ring (White→Pink→Magenta→Purple→Blue→Bloom→Atmos).");
+        }
+
+        // Shared parameter setter so subsequent tuning iterations only override deltas.
+        private static void ApplyRing074Params(Material m)
+        {
+            // Geometry (matches ref ring, best SSIM 0.869)
+            m.SetFloat("_RingCenterX", 0.12f);
+            m.SetFloat("_RingCenterY", -0.43f);
+            m.SetFloat("_RingRadius", 3.05f);
+
+            // L1 Ultra White HDR Core — narrow, blown-out; hue rotates with angle
+            m.SetColor("_CoreColor",     new Color(1.0f, 0.78f, 0.90f, 1.0f));  // warm pole
+            m.SetColor("_CoreCoolColor", new Color(0.55f, 0.78f, 1.0f, 1.0f));  // cool pole
+            m.SetFloat("_CoreIntensity", 45.0f);
+            m.SetFloat("_CoreFalloff",   0.006f);
+
+            // L2 Hot Pink Core
+            m.SetColor("_PinkColor", new Color(1.0f, 0.22f, 0.62f, 1.0f));
+            m.SetFloat("_PinkIntensity", 13.0f);
+            m.SetFloat("_PinkFalloff",   0.026f);
+
+            // L3 Main Magenta Ring
+            m.SetColor("_MagentaColor", new Color(1.0f, 0.04f, 0.85f, 1.0f));
+            m.SetFloat("_MagentaIntensity", 4.2f);
+            m.SetFloat("_MagentaFalloff",   0.072f);
+
+            // L4 Purple / Violet Glow
+            m.SetColor("_PurpleColor", new Color(0.50f, 0.05f, 1.0f, 1.0f));
+            m.SetFloat("_PurpleIntensity", 1.7f);
+            m.SetFloat("_PurpleFalloff",   0.18f);
+
+            // L5 Electric Blue Halo — wide cool band (the missing layer)
+            m.SetColor("_BlueColor", new Color(0.10f, 0.42f, 1.0f, 1.0f));
+            m.SetFloat("_BlueIntensity", 0.95f);
+            m.SetFloat("_BlueFalloff",   0.55f);
+
+            // L6 HDR Bloom feeder — broad cool
+            m.SetColor("_BloomColor", new Color(0.22f, 0.30f, 1.0f, 1.0f));
+            m.SetFloat("_BloomIntensity", 0.50f);
+            m.SetFloat("_BloomFalloff",   1.05f);
+
+            // L7 Large Atmospheric Glow — huge radius, faint
+            m.SetColor("_AtmosColor", new Color(0.26f, 0.16f, 0.92f, 1.0f));
+            m.SetFloat("_AtmosIntensity", 0.12f);
+            m.SetFloat("_AtmosFalloff",   2.4f);
+
+            m.SetFloat("_Exposure", 1.0f);
+            m.SetFloat("_WarmAngle", -0.785f);     // warm pole = bottom-right
+            m.SetFloat("_AngleStrength", 0.55f);
+            m.SetFloat("_WarmSharpness", 2.0f);    // concentrate pink near warm pole
+            m.SetFloat("_CoolRedCut", 0.22f);      // cool side → blue (kill red)
+            m.SetFloat("_WarmBlueCut", 0.55f);     // warm side → pink (trim blue)
+            m.SetFloat("_Instability", 0.30f);
+
+            EditorUtility.SetDirty(m);
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 075 — tighten outer glow so ring interior + sky stay dark.
+        //  Iter074 blue/atmos falloffs were so wide they filled the whole
+        //  interior. Pull them in; ref has a defined halo + black center.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 075 – Tighten Halo")]
+        public static void Iteration075()
+        {
+            Iteration074();   // full 7-layer setup
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                // Electric Blue Halo — defined band hugging the ring, not interior fill
+                m.SetFloat("_BlueIntensity", 0.85f);
+                m.SetFloat("_BlueFalloff",   0.24f);
+                // Purple slightly tighter
+                m.SetFloat("_PurpleFalloff", 0.14f);
+                // HDR Bloom feeder — pull in
+                m.SetFloat("_BloomIntensity", 0.35f);
+                m.SetFloat("_BloomFalloff",   0.50f);
+                // Atmospheric — faint + much tighter (was filling the sky)
+                m.SetFloat("_AtmosIntensity", 0.05f);
+                m.SetFloat("_AtmosFalloff",   1.0f);
+                EditorUtility.SetDirty(m);
+            }
+
+            // Post bloom: enhance the bright line, don't flood the interior
+            VolumeProfile profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(ProfilePath);
+            if (profile != null)
+            {
+                profile.components.Clear();
+                Bloom bloom = profile.Add<Bloom>(true);
+                bloom.active = true;
+                bloom.threshold.Override(1.1f);
+                bloom.intensity.Override(0.5f);
+                bloom.scatter.Override(0.6f);
+                EditorUtility.SetDirty(profile);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 075: tightened blue/bloom/atmos falloffs; dark interior restored.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 076 — strong angular blue/pink split on the ring LINE.
+        //  Ref: cool side (upper-left) is blue, warm side (lower-right) pink.
+        //  Per-layer warm/cool weighting now lives in the shader; push strength.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 076 – Angular Blue/Pink Split")]
+        public static void Iteration076()
+        {
+            Iteration075();   // tightened halo + 7-layer setup
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                // Strong angular split: blue dominates cool side, pink the warm side
+                m.SetFloat("_AngleStrength", 0.80f);
+                m.SetFloat("_WarmAngle", -0.70f);   // warm pole ~ 4-5 o'clock (lower-right)
+
+                // Thinner, slightly less dominant pink band so blue/purple read through
+                m.SetFloat("_PinkIntensity", 11.0f);
+                m.SetFloat("_PinkFalloff",   0.022f);
+                m.SetFloat("_MagentaIntensity", 3.6f);
+
+                // A touch more blue presence on the line
+                m.SetFloat("_BlueIntensity", 0.95f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 076: strong angular blue/pink split (AngleStrength 0.80).");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 077 — blue-dominant line + concentrated pink sector.
+        //  Ref ring is mostly BLUE/purple; pink is a localized lower-right arc.
+        //  Core hue now rotates (blue↔pink); concentrate warmth near warm pole.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 077 – Blue-Dominant Line")]
+        public static void Iteration077()
+        {
+            Iteration076();   // angular split base
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                // Concentrate pink into a localized lower-right arc; rest stays blue
+                m.SetFloat("_WarmSharpness", 2.4f);
+                m.SetFloat("_WarmAngle", -0.80f);
+                m.SetFloat("_AngleStrength", 0.85f);
+
+                // Hue-rotating core line
+                m.SetColor("_CoreColor",     new Color(1.0f, 0.74f, 0.88f, 1.0f));  // warm
+                m.SetColor("_CoreCoolColor", new Color(0.50f, 0.76f, 1.0f, 1.0f));  // cool blue-white
+
+                // Slightly stronger blue presence so cool side reads blue near the line
+                m.SetFloat("_BlueIntensity", 1.15f);
+                m.SetFloat("_BlueFalloff",   0.22f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 077: blue-dominant ring, pink concentrated lower-right.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 078 — hard channel enforcement of ring temperature.
+        //  Cool side red is hard-cut so the upper/left line reads truly blue;
+        //  warm lower-right keeps full pink. Fixes the "pink everywhere" line.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 078 – Hard Temperature Split")]
+        public static void Iteration078()
+        {
+            Iteration077();   // blue-dominant base
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_CoolRedCut", 0.18f);    // strong red kill on cool side
+                m.SetFloat("_WarmBlueCut", 0.55f);
+                m.SetFloat("_WarmSharpness", 2.2f);
+                m.SetFloat("_AngleStrength", 0.85f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 078: hard channel temperature split (cool red cut 0.18).");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 079 — refine: thinner line, pink concentrated lower-right,
+        //  brighter blue-white top. Matches ref hue clock more precisely.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 079 – Refine Line + Hue Clock")]
+        public static void Iteration079()
+        {
+            Iteration078();   // hard temperature split base
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                // Thinner, crisper bright line
+                m.SetFloat("_PinkFalloff",    0.018f);
+                m.SetFloat("_MagentaIntensity", 3.2f);
+                m.SetFloat("_MagentaFalloff", 0.060f);
+
+                // Pink concentrated to lower-right arc (~5 o'clock), rest blue
+                m.SetFloat("_WarmAngle", -1.00f);
+                m.SetFloat("_WarmSharpness", 2.6f);
+
+                // Brighter blue-white top/cool side
+                m.SetColor("_CoreCoolColor", new Color(0.58f, 0.82f, 1.0f, 1.0f));
+                m.SetFloat("_BlueIntensity", 1.05f);
+
+                // Softer, slightly less saturated halo to match ref's gentle glow
+                m.SetFloat("_BlueFalloff", 0.21f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 079: thinner line, pink to lower-right, brighter blue top.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 080 — halo to violet-blue, even brightness around ring.
+        //  Ref halo is violet-blue (not pure electric); line brightness uniform.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 080 – Violet Halo + Even Glow")]
+        public static void Iteration080()
+        {
+            Iteration079();   // refined hue clock base
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                // Halo and bloom feeder shifted toward violet-blue (ref tint)
+                m.SetColor("_BlueColor",  new Color(0.22f, 0.34f, 1.0f, 1.0f));
+                m.SetColor("_BloomColor", new Color(0.30f, 0.26f, 1.0f, 1.0f));
+
+                // More even brightness around the ring (less localized hot spots)
+                m.SetFloat("_Instability", 0.20f);
+                EditorUtility.SetDirty(m);
+            }
+
+            // Slightly stronger, wider bloom for the energetic glow the ТЗ asks for
+            VolumeProfile profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(ProfilePath);
+            if (profile != null)
+            {
+                profile.components.Clear();
+                Bloom bloom = profile.Add<Bloom>(true);
+                bloom.active = true;
+                bloom.threshold.Override(1.0f);
+                bloom.intensity.Override(0.62f);
+                bloom.scatter.Override(0.66f);
+                EditorUtility.SetDirty(profile);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 080: violet-blue halo, even glow, stronger bloom.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 081 — kill green channel: ref blue/magenta have G≈0.
+        //  Deepen blue line + halo so they read deep blue, not cyan/periwinkle.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 081 – Deep Blue (Kill Green)")]
+        public static void Iteration081()
+        {
+            Iteration080();   // violet halo base
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                // Deep blue line + halo (low green), to match ref BGR≈[126,0,x]
+                m.SetColor("_CoreCoolColor", new Color(0.38f, 0.50f, 1.0f, 1.0f));
+                m.SetColor("_BlueColor",     new Color(0.14f, 0.18f, 1.0f, 1.0f));
+                m.SetColor("_BloomColor",    new Color(0.20f, 0.13f, 1.0f, 1.0f));
+                m.SetColor("_AtmosColor",    new Color(0.22f, 0.10f, 0.92f, 1.0f));
+                // Pink with less green so warm side is clean magenta-pink (ref G≈0)
+                m.SetColor("_PinkColor",     new Color(1.0f, 0.16f, 0.60f, 1.0f));
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 081: deep blue (green killed), clean magenta warm side.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 082 — match ref brightness + purer cool blue.
+        //  My ring was ~50% brighter than ref (B 181 vs 121); pull exposure.
+        //  Cool side still had residual red (R 27 vs 6); harden the red cut.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 082 – Match Brightness + Pure Blue")]
+        public static void Iteration082()
+        {
+            Iteration081();   // deep blue base
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_Exposure", 0.75f);     // bring brightness down to ref level
+                m.SetFloat("_CoolRedCut", 0.12f);   // purer blue on cool side (less red)
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 082: exposure 0.75, cool red cut 0.12.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 083 — match ref ring scale + brightness more tightly.
+        //  Core still blows out white (HDR preserved) but band brightness and
+        //  halo width pulled toward ref (B 121, r 0.348).
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 083 – Match Ring Scale")]
+        public static void Iteration083()
+        {
+            Iteration082();   // brightness/blue base
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_Exposure", 0.60f);     // band brightness toward ref
+                // Tighten halo so apparent ring radius shrinks toward ref (0.348)
+                m.SetFloat("_BlueFalloff",  0.17f);
+                m.SetFloat("_PurpleFalloff", 0.12f);
+                m.SetFloat("_BloomFalloff", 0.42f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 083: exposure 0.60, tighter halo (match ref scale).");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 084 — final brightness calibration to ref level.
+        //  Bring sampled band B toward ref (121); core still blows out white.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 084 – Final Brightness Calibration")]
+        public static void Iteration084()
+        {
+            Iteration083();   // matched-scale base
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_Exposure", 0.45f);     // band brightness ≈ ref level
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 084: exposure 0.45 (final brightness calibration).");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 085 — thinner crisp line (drop band-average toward ref),
+        //  keep bright HDR peak. Closes the remaining structural gap.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 085 – Thinner Crisp Line")]
+        public static void Iteration085()
+        {
+            Iteration084();   // brightness-calibrated base
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                // Thinner bright line: peak stays bright, band average drops to ref
+                m.SetFloat("_CoreFalloff",    0.005f);
+                m.SetFloat("_PinkFalloff",    0.014f);
+                m.SetFloat("_MagentaFalloff", 0.050f);
+                // Tighten halo a touch more (apparent radius → ref 0.348)
+                m.SetFloat("_BlueFalloff",  0.15f);
+                m.SetFloat("_Exposure", 0.50f);     // slight pop back since line is thinner
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 085: thinner crisp line, tighter halo.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 086 — thin line + lower exposure (best of 084 & 085).
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 086 – Thin Line + Low Exposure")]
+        public static void Iteration086()
+        {
+            Iteration085();   // thin-line geometry
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_Exposure", 0.42f);     // band brightness back toward ref
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 086: thin line + exposure 0.42.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 087 — push band brightness closer to ref; trim warm red.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 087 – Final Calibration")]
+        public static void Iteration087()
+        {
+            Iteration086();   // thin line + low exposure base
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_Exposure", 0.37f);     // band B closer to ref 121
+                // Warm side was a bit too red (R 47 vs ref 28): trim pink/magenta
+                m.SetFloat("_PinkIntensity", 9.0f);
+                m.SetFloat("_MagentaIntensity", 2.8f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 087: exposure 0.37, trimmed warm red.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 088 — probe lower exposure (0.30) for closest band match.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 088 – Exposure Probe 0.30")]
+        public static void Iteration088()
+        {
+            Iteration087();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null) { m.SetFloat("_Exposure", 0.30f); EditorUtility.SetDirty(m); }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 088: exposure probe 0.30.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 089 — exposure 0.24 probe (band B → ref 121).
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 089 – Exposure Probe 0.24")]
+        public static void Iteration089()
+        {
+            Iteration088();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null) { m.SetFloat("_Exposure", 0.24f); EditorUtility.SetDirty(m); }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 089: exposure probe 0.24.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 090 — WIDEN the white HDR core to match 1.png.
+        //  User: the white blown-out zone is thinner than ref. Dimming shrank
+        //  it; instead widen the core falloff + raise core so a broader band of
+        //  the line clamps to white (wider white zone), keep moderate exposure.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 090 – Widen White Core")]
+        public static void Iteration090()
+        {
+            Iteration089();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                // Wider, stronger white core → broader blown-out white band
+                m.SetFloat("_CoreIntensity", 60.0f);
+                m.SetFloat("_CoreFalloff",   0.020f);   // was 0.005 → much wider white zone
+                // Moderate exposure so the white zone is bright AND wide
+                m.SetFloat("_Exposure", 0.32f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 090: widened white HDR core (falloff 0.020, intensity 60).");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 091 — balanced white core width (between 089 thin & 090 wide).
+        //  Wider than the over-dimmed 089 (fixes user's "white too thin"), but
+        //  not as broad as 090; matches ref's compact bright core + colored glow.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 091 – Balanced White Core")]
+        public static void Iteration091()
+        {
+            Iteration090();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_CoreIntensity", 55.0f);
+                m.SetFloat("_CoreFalloff",   0.014f);   // compact-but-visible white zone
+                m.SetFloat("_Exposure", 0.34f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 091: balanced white core (falloff 0.014).");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 092 — ROTATE COLOR MASK ONLY (angle of gradient).
+        //  Pink max must sit at 1-3 o'clock (upper-right), not at the bottom.
+        //  Only _WarmAngle changes — colors/Bloom/Glow/Falloff all untouched.
+        //  Rotate the warm pole CCW (increase angle) so pink rises up the right.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 092 – Rotate Color Mask")]
+        public static void Iteration092()
+        {
+            Iteration091();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                // Warm pole: from -1.00 rad (~5 o'clock) up toward upper-right.
+                // angle convention: 0 = 3 o'clock, +π/2 = 12 o'clock (CCW positive).
+                m.SetFloat("_WarmAngle", -0.10f);   // ~ -6° ≈ 3 o'clock, then refine up
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 092: rotated color mask warm pole to -0.10 rad (~3 o'clock).");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 093 — color mask angle only: lift pink max to 2-3 o'clock.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 093 – Pink to 2-3 o'clock")]
+        public static void Iteration093()
+        {
+            Iteration092();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null) { m.SetFloat("_WarmAngle", 0.30f); EditorUtility.SetDirty(m); }  // ~+17° ≈ 2:30
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 093: warm pole to +0.30 rad (~2:30).");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 094 — fine-tune color mask angle (between 092 and 093).
+        //  Pink center ~3 o'clock to best overlap ref's right-side pink zone.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 094 – Color Mask Fine Angle")]
+        public static void Iteration094()
+        {
+            Iteration093();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null) { m.SetFloat("_WarmAngle", 0.10f); EditorUtility.SetDirty(m); }  // ~+6° ≈ 3 o'clock
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 094: warm pole +0.10 rad (~3 o'clock).");
+        }
+
         // ═══════════════════════════════════════════════════════════════
         //  Private helpers
         // ═══════════════════════════════════════════════════════════════
