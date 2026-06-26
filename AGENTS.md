@@ -13,11 +13,15 @@ Iterate the Unity NeonPortalScene scene until a real Unity render in `ref/curren
 3. **View `ref/current.png`** — the current render state
 4. **Check last iteration number** in `Assets/Editor/VisualMatchTool.cs` — add new iterations starting from that number + 1
 
-## Current State (as of 2026-06-26 — BREAKTHROUGH, ceiling broken)
+## Current State (as of 2026-06-26 — BREAKTHROUGH, ring focus per updated ТЗ)
 
-- **Scene**: Iteration068 — textured `bg.png` backdrop + live lavender ring
-- **Current SSIM**: **0.8657** vs `ref/1.png` (was 0.6341)
-- **Next iteration**: Iteration069
+- **Scene**: Iteration071 — textured `bg.png` backdrop + HDR neon ring + bloom
+- **Current SSIM**: **0.8643** vs `ref/1.png` (max-SSIM variant is Iter068 = 0.8657
+  sharp ring; Iter071 preferred because updated ТЗ requires HDR bloom/glow)
+- **Next iteration**: Iteration073
+- **Method ceiling ≈ 0.866** (bg.png vs 1.png = 0.8628; ring adds ~+0.003). To
+  exceed it: reproduce the ref ring's INNER glow (bloom only pushes outward).
+  Updated ТЗ (ref/ТЗ.txt) is now ring-focused — see AI_CONTEXT.md.
 - **Breakthrough**: use `ref/bg.png` (authored ring-less background) as a real
   Unlit backdrop quad, render the live ring on top, post-processing OFF. See
   AI_CONTEXT.md "BREAKTHROUGH" section for the full recipe and gotchas

@@ -3640,6 +3640,149 @@ namespace Ediskrad.AudioVisualizer.Editor
             Debug.Log("[VisualMatch] Iteration 068: ring radius -2% to match ref (final).");
         }
 
+        // ────────────────────────────────────────────────────────────────
+        // Iteration 069 – HDR Ring + Bloom Halo (ring focus per updated ТЗ)
+        // Updated ТЗ shifts the goal to making the RING indistinguishable
+        // from 1.png: glow radius, inner/outer glow, falloff, gradient.
+        // Ref ring (measured): narrow bright core at r~190 (peak luma 150)
+        // with bloom halo (inner r170-190, outer r190-215); lavender
+        // BGR~[250,80,145] bright on left/top/bottom, dim on right [120,0,36].
+        // Approach: HDR ring (emission >1) + a BLOOM-ONLY volume with a high
+        // threshold (~1.0) so only the HDR ring blooms and the LDR backdrop
+        // (all <1) is untouched. No ACES/contrast/vignette (those distort
+        // the backdrop). Ring color: bright lavender left, dim violet right.
+        // ────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 069 – HDR Ring + Bloom Halo")]
+        public static void Iteration069()
+        {
+            Iteration068();   // clean backdrop + tuned ring geometry/position
+
+            // Enable HDR + post-processing for bloom
+            Camera cam = Object.FindObjectOfType<Camera>();
+            if (cam != null)
+            {
+                cam.allowHDR = true;
+                var camData = cam.GetComponent<UniversalAdditionalCameraData>();
+                if (camData != null) camData.renderPostProcessing = true;
+                EditorUtility.SetDirty(cam.gameObject);
+            }
+
+            // Build a BLOOM-ONLY volume profile (no tonemapping/color/vignette)
+            VolumeProfile profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(ProfilePath);
+            if (profile == null)
+            { profile = ScriptableObject.CreateInstance<VolumeProfile>(); AssetDatabase.CreateAsset(profile, ProfilePath); }
+            profile.components.Clear();
+            Bloom bloom = profile.Add<Bloom>(true);
+            bloom.active = true;
+            bloom.threshold.Override(1.0f);   // only HDR ring (>1) blooms; backdrop (<1) untouched
+            bloom.intensity.Override(0.9f);
+            bloom.scatter.Override(0.65f);
+            EditorUtility.SetDirty(profile);
+
+            foreach (string n in new[] { "Cinematic Post Process Volume" })
+            { GameObject go = GameObject.Find(n); if (go != null) { go.SetActive(true); EditorUtility.SetDirty(go); } }
+            foreach (Volume v in Resources.FindObjectsOfTypeAll<Volume>())
+            { if (v.gameObject.scene.IsValid()) { v.enabled = true; v.sharedProfile = profile; EditorUtility.SetDirty(v); } }
+            // Neutralize the pulse controller so it doesn't override bloom
+            FixPostProcessController(0.9f, 0.0f);
+
+            // HDR ring: bright lavender (left/top/bottom), dim violet (right)
+            Material ring = LoadMat(RingMatPath);
+            if (ring != null)
+            {
+                ring.SetColor("_ColorA", new Color(3.0f, 1.4f, 5.2f, 1f));   // bright lavender (B-dominant + green for whiteness)
+                ring.SetColor("_ColorB", new Color(0.9f, 0.0f, 2.2f, 1f));   // dim violet (right side darker)
+                ring.SetFloat("_Intensity", 1.2f);
+                ring.SetFloat("_SegmentContrast", 0.20f);
+                EditorUtility.SetDirty(ring);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 069: HDR ring + bloom-only halo (threshold 1.0).");
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // Iteration 070 – Wider Ring Glow (inner+outer halo)
+        // Iter069 radial profile vs ref: our halo is too narrow/sharp and
+        // pushed outward — ref has a wide soft glow BOTH sides (inner glow
+        // r170-185 ~55, ours ~4; outer r200-215 fades 23→9, ours cliffs).
+        // Increase bloom scatter for a wider, softer halo that fills inward
+        // and fades outward like the reference. Threshold slightly lower so
+        // more of the ring contributes to glow.
+        // ────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 070 – Wider Ring Glow")]
+        public static void Iteration070()
+        {
+            Iteration069();
+
+            VolumeProfile profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(ProfilePath);
+            if (profile != null)
+            {
+                if (!profile.TryGet<Bloom>(out Bloom bloom)) bloom = profile.Add<Bloom>(true);
+                bloom.active = true;
+                bloom.threshold.Override(0.85f);
+                bloom.intensity.Override(1.0f);
+                bloom.scatter.Override(0.85f);   // wider halo
+                EditorUtility.SetDirty(profile);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 070: wider ring glow (scatter 0.85).");
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // Iteration 071 – Fix Ring Color (blue-dominant, no white blow-out)
+        // Iter069/070 ring blew out to WHITE (too much green in ColorA +
+        // bloom) — ref core is blue-dominant lavender BGR~[250,80,145], not
+        // white. Reduce green, keep blue dominant, lower intensity so the
+        // HDR ring + bloom reads as blue→pink neon instead of white.
+        // ────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 071 – Fix Ring Color")]
+        public static void Iteration071()
+        {
+            Iteration069();   // HDR ring + bloom base
+
+            Material ring = LoadMat(RingMatPath);
+            if (ring != null)
+            {
+                ring.SetColor("_ColorA", new Color(1.7f, 0.25f, 5.5f, 1f));   // blue-dominant lavender (low green)
+                ring.SetColor("_ColorB", new Color(0.7f, 0.0f, 2.0f, 1f));    // dim violet (right darker)
+                ring.SetFloat("_Intensity", 1.0f);
+                ring.SetFloat("_SegmentContrast", 0.20f);
+                EditorUtility.SetDirty(ring);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 071: blue-dominant ring color (no white blow-out).");
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // Iteration 072 – Ring Gradient Match (blue-bright left, dark right)
+        // Per-angle measurement: ref ring left/top is bright blue-dominant
+        // (BGR[251,70,150], luma~115), right is dark (BGR[110,0,31], luma~22).
+        // Ours was too pink (R≈B) and the right side too bright (luma~47).
+        // Set ColorA to the ref's R:G:B ratio (0.6:0.28:1.0) scaled bright,
+        // and ColorB much darker so the right side falls off like the ref.
+        // ────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 072 – Ring Gradient Match")]
+        public static void Iteration072()
+        {
+            Iteration069();   // HDR ring + bloom base
+
+            Material ring = LoadMat(RingMatPath);
+            if (ring != null)
+            {
+                ring.SetColor("_ColorA", new Color(4.2f, 2.0f, 7.0f, 1f));   // bright blue-lavender (left/top, ref ratio)
+                ring.SetColor("_ColorB", new Color(0.5f, 0.0f, 1.8f, 1f));   // dark violet (right falls off)
+                ring.SetFloat("_Intensity", 1.0f);
+                ring.SetFloat("_SegmentContrast", 0.20f);
+                EditorUtility.SetDirty(ring);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 072: ring gradient match (bright blue left, dark right).");
+        }
+
         // ═══════════════════════════════════════════════════════════════
         //  Private helpers
         // ═══════════════════════════════════════════════════════════════

@@ -4,7 +4,26 @@
 
 ## Project Goal
 Make `Assets/Scenes/NeonPortalScene.unity` match reference `ref/1.png` with SSIM >98%.
-**Current best (2026-06-26): Iteration068 active, SSIM=0.8657.**
+**Current best (2026-06-26): Iteration071 active, SSIM=0.8643 (HDR neon ring + bloom).**
+Max SSIM variant is Iteration068 (0.8657, sharp ring no bloom); Iter071 is preferred
+because the updated ТЗ requires HDR Bloom/glow on the ring (см. ring focus below).
+
+### Updated ТЗ (ring focus)
+ref/ТЗ.txt was replaced: the goal is now to make the RING indistinguishable from
+1.png — analyze diameter, thickness, circle shape, core brightness, HDR Bloom,
+glow radius, inner/outer glow, glow falloff, color temperature, magenta/violet/blue,
+blow-outs, antialiasing, ring-vs-background contrast. Tune Emission, Bloom
+(Intensity/Threshold/Scatter), HDR, Glow Radius/Falloff/Opacity, Ring Thickness,
+Core Width, Gradient Colors, Additive Alpha, shader falloff, smoothstep, exposure.
+
+### Practical ceiling of this method ≈ 0.866
+- Backdrop alone: raw bg.png vs 1.png = 0.8628 (the structural ceiling — bg.png's
+  background differs from 1.png, which is lit by the ring).
+- Ring variations all land 0.862–0.866 (±0.002 = "imperceptible" per ТЗ stop rule).
+- To exceed ~0.866 you'd need the ring's INNER glow (ref radial r170-185 ~55, ours
+  ~4) — bloom pushes outward, not inward. URP bloom scatter/threshold edits did NOT
+  take effect after the first build (cause unconfirmed; PortalPulseController is NOT
+  the culprit — its Update only runs in Play mode). 0.98 is unreachable with bg.png.
 
 ### BREAKTHROUGH (Iter059-068): Textured backdrop approach
 The old "procedural ceiling ~0.634" was broken by using `ref/bg.png` (the
@@ -98,11 +117,16 @@ Important correction: a previous `Iteration025` calibration shortcut copied `ref
 | 065  | **0.8629** | **MIRROR FIX** — removed erroneous U-flip; clean backdrop, no ring |
 | 066  | 0.8548 | Backdrop + live ring (too pink/sharp) |
 | 067  | 0.8579 | Backdrop + lavender LDR ring |
-| 068  | **0.8657** | **CURRENT BEST** — ring radius -2% match; ring now ADDS over backdrop |
+| 068  | **0.8657** | **MAX SSIM** — ring radius -2% match; sharp ring ADDS over backdrop |
+| 069  | 0.8621 | HDR ring + bloom-only halo (threshold 1.0); white blow-out |
+| 070  | 0.8621 | wider glow attempt (bloom scatter edit did NOT apply) |
+| 071  | **0.8643** | **CURRENT** — HDR neon ring, blue-dominant color (no blow-out) + bloom |
+| 072  | 0.8627 | ring gradient color match; no SSIM gain |
 
-**Old procedural ceiling (~0.634) BROKEN.** New best **SSIM=0.8657** via textured backdrop.
+**Old procedural ceiling (~0.634) BROKEN.** New best **SSIM=0.8657** (Iter068 sharp) /
+0.8643 (Iter071 neon glow, preferred per ТЗ). Method ceiling ≈ 0.866.
 
-Current saved scene is `Iteration068`. Next iteration: `Iteration069`.
+Current saved scene is `Iteration071`. Next iteration: `Iteration073`.
 
 ### Remaining gap to 0.98 (from Iter068, SSIM=0.8657)
 - Backdrop is essentially maxed (raw bg.png vs 1.png = 0.8628; the live ring

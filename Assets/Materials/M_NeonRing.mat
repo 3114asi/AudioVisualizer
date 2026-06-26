@@ -26,11 +26,11 @@ Material:
     m_Ints: []
     m_Floats:
     - _FlowOffset: 0
-    - _Intensity: 0.8
+    - _Intensity: 1
     - _NoiseStrength: 0
     - _Pulse: 1
     - _SegmentContrast: 0.2
     m_Colors:
-    - _ColorA: {r: 0.55, g: 0.1, b: 1, a: 1}
-    - _ColorB: {r: 0.65, g: 0.06, b: 0.85, a: 1}
+    - _ColorA: {r: 1.7, g: 0.25, b: 5.5, a: 1}
+    - _ColorB: {r: 0.7, g: 0, b: 2, a: 1}
   m_BuildTextureStacks: []
