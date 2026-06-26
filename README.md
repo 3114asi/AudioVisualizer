@@ -1,103 +1,68 @@
-# AudioVisualizer
+# AudioVisualizer Neon Portal
 
-Android-приложение `com.ediskrad.audiovisualizer` с неоновым аудиовизуализатором в стиле референса `reference/1.png`.
-
-## Что реализовано
-
-- Jetpack Compose UI с полноэкранной сценой.
-- Реактивное неоновое кольцо, лучи и частицы на `Canvas`.
-- FFT 1024, сглаживание спектра, вычисление `bass`, `mids`, `highs`.
-- Два режима входа:
-  - `Microphone`
-  - `Internal Audio` через `MediaProjection` + `AudioPlaybackCapture`
-- Минималистичный overlay с `Start`, `Stop`, выбором режима, `Sensitivity`, `FPS`.
-- Совместимость с Android 10+ и актуальным порядком запуска `MediaProjection` для Android 14/15.
-
-## Структура
-
-- `app/src/main/java/com/ediskrad/audiovisualizer/audio` — аудио-абстракции и анализ.
-- `app/src/main/java/com/ediskrad/audiovisualizer/audio/capture` — провайдеры захвата.
-- `app/src/main/java/com/ediskrad/audiovisualizer/ui` — Compose UI и отрисовка.
-- `app/src/main/java/com/ediskrad/audiovisualizer/visualizer` — состояние и orchestration.
-- `app/src/main/java/com/ediskrad/audiovisualizer/MediaProjectionForegroundService.kt` — foreground service для корректного internal audio capture.
-- `docs/ARCHITECTURE.md` — техническая архитектура.
-- `AGENTS.md` и `AI_CONTEXT.md` — быстрый контекст для ИИ-ассистентов.
-
-## Ключевые сценарии
-
-### Microphone
-
-1. Пользователь выбирает `Microphone`.
-2. При `Start` приложение запрашивает `RECORD_AUDIO`, если нужно.
-3. `MicrophoneAudioProvider` читает PCM из `AudioRecord`.
-4. `SpectrumAnalyzer` считает FFT и отдает данные в UI.
-
-### Internal Audio
-
-1. Пользователь выбирает `Internal Audio`.
-2. При `Start` приложение вызывает `createScreenCaptureIntent()`.
-3. После подтверждения поднимается `MediaProjectionForegroundService`.
-4. Уже внутри foreground service создается `MediaProjection`.
-5. `PlaybackCaptureAudioProvider` читает системный PCM через `AudioPlaybackCaptureConfiguration`.
-
-Это важно: на части устройств и прошивок получение `MediaProjection` из `Activity` до полноценного foreground service приводит к сбоям или отказу доступа.
-
-## Сборка
-
-```bash
-./gradlew assembleDebug
-```
-
-Windows:
-
-```powershell
-.\gradlew.bat assembleDebug
-```
-
-Готовый APK:
-
-- `app/build/outputs/apk/debug/app-debug.apk`
+Unity/Android проект `com.ediskrad.audiovisualizer` с процедурной сценой неонового космического портала в вертикальном формате 9:16.
 
 ## Требования
 
-- Android Studio Jellyfish+ или совместимая версия.
-- Android SDK установлен локально.
-- `minSdk = 29`
-- JDK 17+.
+- Unity 2022 LTS или новее.
+- Android Build Support.
+- При первом открытии Unity установит зависимости из `Packages/manifest.json`: URP, Shader Graph и Visual Effect Graph.
 
-## Internal Audio
+## Запуск
 
-- При выборе `Internal Audio` система запросит screen capture consent.
-- Захват работает только для приложений, которые разрешают playback capture на Android 10+.
-- Некоторые стриминговые приложения могут не отдавать аудио в capture API по политике платформы.
-- На Android 14+ для этого сценария обязателен foreground service типа `mediaProjection`.
+1. Откройте корневую папку проекта в Unity Hub или Unity Editor.
+2. Дождитесь импорта пакетов.
+3. Сцена `Assets/Scenes/NeonPortalScene.unity` создается автоматически editor-bootstrap-скриптом.
+4. Если сцену нужно пересобрать вручную: `Tools > AudioVisualizer > Rebuild Neon Portal Scene`.
+5. Откройте `NeonPortalScene` и нажмите Play.
 
-## Совместимость
+## Android настройки
 
-- `minSdk 29`, `targetSdk 35`.
-- Проверенный сценарий сборки: Windows + Android Studio + локальный Android SDK.
-- Для Windows-пути с не-ASCII символами включен `android.overridePathCheck=true`.
-- Для `compileSdk = 35` добавлен `android.suppressUnsupportedCompileSdk=35`, чтобы текущая версия AGP не шумела при синхронизации.
+Bootstrap задает:
 
-## Unity-реализация
+- Package name: `com.ediskrad.audiovisualizer`.
+- Target Platform: Android.
+- Graphics API: Vulkan.
+- Color Space: Linear.
+- Texture compression: ASTC.
+- Scripting Backend: IL2CPP.
+- Architecture: ARM64.
+- HDR на камере включен.
+- Вертикальная композиция под 1152 x 1760 и 9:16.
 
-Директория `unity/` содержит альтернативную реализацию на Unity 6 (URP):
+## Качество
 
-- Кольцо из дискретных светящихся частиц с аддитивным блендингом и URP Bloom.
-- Градиент по углу: cyan (#3FC6FF) → magenta (#E040FB).
-- Bass-burst: стрики наружу от кольца при ударах баса.
-- Те же два режима входа: Microphone и Internal Audio (scaffold).
+В `ProjectSettings/QualitySettings.asset` заведены профили `Low`, `Medium`, `High`, `Ultra`.
 
-**Скрипты:** `unity/Scripts/`
-**Инструкция по сборке:** `unity/UNITY_SETUP.md`
+- `Low`: меньше частиц, ниже LOD, сниженный resolution scale.
+- `Medium`: умеренный bloom/частицы для массовых Android-устройств.
+- `High`: целевой профиль для современных устройств.
+- `Ultra`: максимум частиц и более плотные прозрачные слои.
 
-## Для разработчиков и ИИ
+Скрипт `ParticleLODController` автоматически применяет лимиты частиц по текущему quality level. Диапазон сцены: примерно 3000-15000 частиц.
 
-- Быстрый архитектурный контекст: `AI_CONTEXT.md`
-- Инструкции по изменению проекта: `AGENTS.md`
-- Подробная архитектура: `docs/ARCHITECTURE.md`
-- Unity-реализация: `unity/UNITY_SETUP.md`
+## Эффекты сцены
 
-## Примечание по пути проекта
+- Фон: почти черный космос с мягким сине-фиолетовым свечением и звездной пылью.
+- Центральный объект: абсолютно черный диск без деталей, имитирующий затмение/портал.
+- Энергетическое кольцо: HDR emission, cyan слева и magenta/фиолетовый справа/снизу, Fresnel-like glow, пульсация и бегущие сегменты.
+- Плазменная корона: процедурный неровный annulus mesh с animated noise/displacement в шейдере.
+- Частицы: звездная пыль, радиальные искры, плазменные точки и редкие крупные вспышки на additive material.
+- Световые лучи: короткие radial shaft planes, которые вспыхивают случайными импульсами.
+- Дымка: прозрачные noise planes над нижней частью сцены и горами.
+- Низ сцены: темные горные силуэты, пурпурно-синяя подсветка горизонта и дрожащее отражение на воде.
+- Постобработка: Bloom, ACES tonemapping, cold color grading, vignette, слабая chromatic aberration.
+- Анимация: 10-секундный loop с пульсацией кольца, flow по окружности, движением частиц, вспышками лучей, дымкой, ripple-отражением и медленным camera push-in.
 
-Проект находится в директории с не-ASCII символами, поэтому в `gradle.properties` включен `android.overridePathCheck=true`. Это нужно для корректной сборки на Windows.
+## Скрипты
+
+- `PortalPulseController.cs`: управляет пульсацией emission, accent lights и Bloom.
+- `RingEnergyFlow.cs`: двигает shader flow и плазменные точки по окружности.
+- `RadialBurstSpawner.cs`: включает случайные вспышки радиальных лучей.
+- `ParticleLODController.cs`: снижает лимиты частиц по quality level.
+- `WaterReflectionAnimator.cs`: анимирует дрожание отражения на воде.
+- `CameraCinematicMotion.cs`: добавляет медленный cinematic push-in.
+
+## Шейдеры
+
+Проект подключает Shader Graph/VFX Graph пакеты для URP. Сгенерированная сцена использует легкие URP-compatible shader assets в `Assets/Shaders`, сделанные как production-friendly эквиваленты Shader Graph: emission ring, additive mist/rays и water reflection. Такой вариант проще контролировать в git и стабильнее для Android.
