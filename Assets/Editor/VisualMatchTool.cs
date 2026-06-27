@@ -4549,6 +4549,798 @@ namespace Ediskrad.AudioVisualizer.Editor
             Debug.Log("[VisualMatch] Iteration 094: warm pole +0.10 rad (~3 o'clock).");
         }
 
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 095 — channel-balance the current 7-layer ring.
+        //  Iter094 has correct geometry and hue clock, but ring metrics show:
+        //  cool side B/G/R too high and warm side R/G too high. Keep radius,
+        //  Bloom and falloff model intact; only rebalance layer colours and
+        //  intensities toward ref ring samples.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 095 – Channel Balance")]
+        public static void Iteration095()
+        {
+            Iteration094();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                // Cool side: reduce excess blue/green/red energy while staying blue.
+                m.SetColor("_CoreCoolColor", new Color(0.24f, 0.32f, 1.0f, 1.0f));
+                m.SetColor("_BlueColor",     new Color(0.08f, 0.10f, 1.0f, 1.0f));
+                m.SetColor("_BloomColor",    new Color(0.14f, 0.07f, 0.95f, 1.0f));
+                m.SetColor("_AtmosColor",    new Color(0.18f, 0.05f, 0.85f, 1.0f));
+                m.SetFloat("_BlueIntensity", 0.82f);
+                m.SetFloat("_BloomIntensity", 0.28f);
+                m.SetFloat("_AtmosIntensity", 0.035f);
+                m.SetFloat("_CoolRedCut", 0.08f);
+
+                // Warm side: trim red/green overshoot but keep the right arc pink.
+                m.SetColor("_PinkColor",    new Color(0.88f, 0.08f, 0.58f, 1.0f));
+                m.SetColor("_MagentaColor", new Color(0.86f, 0.02f, 0.82f, 1.0f));
+                m.SetFloat("_PinkIntensity", 7.5f);
+                m.SetFloat("_MagentaIntensity", 2.2f);
+                m.SetFloat("_WarmBlueCut", 0.62f);
+
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 095: channel balance for cool/warm ring samples.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 096 — reduce residual halo energy from Iter095.
+        //  Keep the HDR core peak comparable while pulling the broad coloured
+        //  layers down; this targets the ring sample overshoot without moving
+        //  geometry or touching the backdrop.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 096 – Halo Energy Trim")]
+        public static void Iteration096()
+        {
+            Iteration095();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_Exposure", 0.30f);
+                m.SetFloat("_CoreIntensity", 60.0f);   // preserves peak after exposure trim
+                m.SetFloat("_CoreFalloff", 0.012f);
+
+                m.SetFloat("_BlueIntensity", 0.65f);
+                m.SetFloat("_BloomIntensity", 0.22f);
+                m.SetFloat("_AtmosIntensity", 0.026f);
+
+                m.SetFloat("_PinkIntensity", 6.5f);
+                m.SetFloat("_MagentaIntensity", 1.8f);
+                m.SetFloat("_WarmBlueCut", 0.68f);
+
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 096: trimmed halo/bloom energy while preserving HDR core peak.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 097 — micro-align detected ring contour.
+        //  After Iter096 the measured contour is slightly right and slightly
+        //  small: curr (0.516,0.530,r=0.346) vs ref (0.512,0.531,r=0.348).
+        //  Probe a sub-pixel-scale world-space correction only.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 097 – Ring Micro Align")]
+        public static void Iteration097()
+        {
+            Iteration096();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_RingCenterX", 0.085f);
+                m.SetFloat("_RingCenterY", -0.445f);
+                m.SetFloat("_RingRadius", 3.070f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 097: micro-aligned ring contour left/down/larger.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 098 — corrective trim after Iter097 regression.
+        //  Restore the proven Iter096 geometry, then test a slightly darker
+        //  coloured halo while keeping the white core peak alive.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 098 – Restore Geometry + Trim")]
+        public static void Iteration098()
+        {
+            Iteration096();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_RingCenterX", 0.12f);
+                m.SetFloat("_RingCenterY", -0.43f);
+                m.SetFloat("_RingRadius", 3.05f);
+
+                m.SetFloat("_Exposure", 0.28f);
+                m.SetFloat("_CoreIntensity", 66.0f);
+                m.SetFloat("_CoreFalloff", 0.0115f);
+
+                m.SetFloat("_BlueIntensity", 0.50f);
+                m.SetFloat("_BloomIntensity", 0.18f);
+                m.SetFloat("_AtmosIntensity", 0.020f);
+
+                m.SetFloat("_PinkIntensity", 5.5f);
+                m.SetFloat("_MagentaIntensity", 1.5f);
+                m.SetFloat("_WarmBlueCut", 0.72f);
+
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 098: restored Iter096 geometry, darker coloured halo/core-balanced trim.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 099 — continue the successful halo/core trim trend.
+        //  Iter098 improved strongly, but samples still show excess colour
+        //  energy on both sides. Trim broad layers one more step while holding
+        //  the white core peak roughly constant via higher core intensity.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 099 – Deeper Halo Trim")]
+        public static void Iteration099()
+        {
+            Iteration098();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_Exposure", 0.26f);
+                m.SetFloat("_CoreIntensity", 72.0f);
+                m.SetFloat("_CoreFalloff", 0.0105f);
+
+                m.SetFloat("_BlueIntensity", 0.36f);
+                m.SetFloat("_BloomIntensity", 0.13f);
+                m.SetFloat("_AtmosIntensity", 0.015f);
+
+                m.SetFloat("_PinkIntensity", 4.5f);
+                m.SetFloat("_MagentaIntensity", 1.1f);
+                m.SetFloat("_WarmBlueCut", 0.78f);
+
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 099: deeper halo trim with preserved core peak.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 100 — reduce red/green channel leakage in the ring core.
+        //  Iter099 improved, but sampled left/right arcs still carry too much
+        //  G/R. Keep the successful energy level and make core/pink/magenta
+        //  colours cleaner blue-magenta with less green and warm red.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 100 – Core Channel Clean")]
+        public static void Iteration100()
+        {
+            Iteration099();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetColor("_CoreCoolColor", new Color(0.16f, 0.18f, 1.0f, 1.0f));
+                m.SetColor("_CoreColor",     new Color(0.78f, 0.35f, 0.95f, 1.0f));
+
+                m.SetColor("_PinkColor",    new Color(0.66f, 0.02f, 0.58f, 1.0f));
+                m.SetColor("_MagentaColor", new Color(0.62f, 0.00f, 0.82f, 1.0f));
+                m.SetFloat("_PinkIntensity", 3.3f);
+                m.SetFloat("_MagentaIntensity", 0.8f);
+
+                m.SetFloat("_BlueIntensity", 0.30f);
+                m.SetFloat("_BloomIntensity", 0.11f);
+
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 100: cleaned core red/green leakage while keeping Iter099 energy.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 101 — radius-only probe after Iter100.
+        //  The dimmer ring now measures too small. Earlier full geometry shift
+        //  regressed, so isolate radius with the Iter100 centre unchanged.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 101 – Radius Only Probe")]
+        public static void Iteration101()
+        {
+            Iteration100();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_RingRadius", 3.10f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 101: radius-only probe at 3.10, centre unchanged.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 102 — corrective continuation from Iter100.
+        //  Radius probes regress; keep Iter100 geometry and test a near-minimal
+        //  coloured halo with the HDR core peak held by intensity.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 102 – Minimal Halo Probe")]
+        public static void Iteration102()
+        {
+            Iteration100();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_RingRadius", 3.05f);
+
+                m.SetFloat("_Exposure", 0.245f);
+                m.SetFloat("_CoreIntensity", 80.0f);
+                m.SetFloat("_CoreFalloff", 0.0095f);
+
+                m.SetFloat("_BlueIntensity", 0.22f);
+                m.SetFloat("_BloomIntensity", 0.08f);
+                m.SetFloat("_AtmosIntensity", 0.010f);
+
+                m.SetFloat("_PinkIntensity", 2.4f);
+                m.SetFloat("_MagentaIntensity", 0.55f);
+                m.SetFloat("_WarmBlueCut", 0.85f);
+
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 102: restored Iter100 geometry, near-minimal coloured halo.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 103 — very narrow core / minimal halo probe.
+        //  The SSIM trend still rewards trimming broad additive layers, so test
+        //  one more step with a sharper core and very low colour halo energy.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 103 – Narrow Core Probe")]
+        public static void Iteration103()
+        {
+            Iteration102();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_Exposure", 0.225f);
+                m.SetFloat("_CoreIntensity", 92.0f);
+                m.SetFloat("_CoreFalloff", 0.0080f);
+
+                m.SetFloat("_BlueIntensity", 0.14f);
+                m.SetFloat("_BloomIntensity", 0.05f);
+                m.SetFloat("_AtmosIntensity", 0.006f);
+
+                m.SetFloat("_PinkIntensity", 1.6f);
+                m.SetFloat("_MagentaIntensity", 0.30f);
+                m.SetFloat("_WarmBlueCut", 0.90f);
+
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 103: very narrow core with minimal halo energy.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 104 — violet/blue core cleanup.
+        //  Iter103 still measures too much red/green, especially on the warm
+        //  side. Keep the narrow-energy setup and reduce warm red/green leakage
+        //  in the core and remaining colour layers.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 104 – Violet Core Clean")]
+        public static void Iteration104()
+        {
+            Iteration103();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetColor("_CoreCoolColor", new Color(0.10f, 0.10f, 1.0f, 1.0f));
+                m.SetColor("_CoreColor",     new Color(0.45f, 0.08f, 1.0f, 1.0f));
+
+                m.SetColor("_BlueColor",  new Color(0.03f, 0.03f, 1.0f, 1.0f));
+                m.SetColor("_BloomColor", new Color(0.06f, 0.02f, 0.80f, 1.0f));
+
+                m.SetColor("_PinkColor",    new Color(0.35f, 0.00f, 0.58f, 1.0f));
+                m.SetColor("_MagentaColor", new Color(0.25f, 0.00f, 0.82f, 1.0f));
+                m.SetFloat("_PinkIntensity", 0.9f);
+                m.SetFloat("_MagentaIntensity", 0.15f);
+                m.SetFloat("_CoolRedCut", 0.04f);
+
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 104: cleaned warm red/green leakage toward violet-blue core.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 105 — pure-blue halo restore probe.
+        //  Fixed-radius annulus samples show Iter104's wide ring band is darker
+        //  than ref. Restore a small amount of clean blue halo without bringing
+        //  back warm red/green leakage.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 105 – Pure Blue Halo Probe")]
+        public static void Iteration105()
+        {
+            Iteration104();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetColor("_BlueColor",  new Color(0.02f, 0.01f, 1.0f, 1.0f));
+                m.SetColor("_BloomColor", new Color(0.03f, 0.00f, 0.75f, 1.0f));
+                m.SetFloat("_BlueIntensity", 0.26f);
+                m.SetFloat("_BloomIntensity", 0.08f);
+                m.SetFloat("_AtmosIntensity", 0.008f);
+
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 105: restored a small clean blue halo after Iter104.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 106 — corrective darker probe from Iter104.
+        //  Iter105's halo restore regressed slightly, so branch back to Iter104
+        //  and test whether an even narrower, lower-energy ring still improves.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 106 – Dark Narrow Probe")]
+        public static void Iteration106()
+        {
+            Iteration104();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_Exposure", 0.205f);
+                m.SetFloat("_CoreIntensity", 110.0f);
+                m.SetFloat("_CoreFalloff", 0.0065f);
+
+                m.SetFloat("_BlueIntensity", 0.08f);
+                m.SetFloat("_BloomIntensity", 0.025f);
+                m.SetFloat("_AtmosIntensity", 0.003f);
+
+                m.SetFloat("_PinkIntensity", 0.4f);
+                m.SetFloat("_MagentaIntensity", 0.05f);
+                m.SetFloat("_WarmBlueCut", 0.94f);
+
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 106: darker/narrower ring branch from Iter104.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 107 - explicit white HDR core restore.
+        //  User target: visible blown-out white ring core, with pink/magenta
+        //  glow on the right/top and electric blue/violet on the left/bottom.
+        //  Geometry/backdrop/camera stay unchanged.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 107 - White HDR Core Restore")]
+        public static void Iteration107()
+        {
+            Iteration094();   // rebuilds the material after shader property changes
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_RingCenterX", 0.12f);
+                m.SetFloat("_RingCenterY", -0.43f);
+                m.SetFloat("_RingRadius", 3.05f);
+
+                // Separate white source line. Chroma layers sit around it.
+                m.SetColor("_WhiteCoreColor", new Color(1.0f, 0.96f, 1.0f, 1.0f));
+                m.SetFloat("_WhiteCoreIntensity", 96.0f);
+                m.SetFloat("_WhiteCoreFalloff", 0.0105f);
+
+                // Keep a coloured rim beneath the white core, but do not let it
+                // replace the core line.
+                m.SetColor("_CoreCoolColor", new Color(0.42f, 0.62f, 1.0f, 1.0f));
+                m.SetColor("_CoreColor", new Color(1.0f, 0.70f, 0.92f, 1.0f));
+                m.SetFloat("_CoreIntensity", 24.0f);
+                m.SetFloat("_CoreFalloff", 0.020f);
+
+                m.SetColor("_PinkColor", new Color(1.0f, 0.12f, 0.66f, 1.0f));
+                m.SetFloat("_PinkIntensity", 8.5f);
+                m.SetFloat("_PinkFalloff", 0.035f);
+
+                m.SetColor("_MagentaColor", new Color(0.95f, 0.00f, 0.88f, 1.0f));
+                m.SetFloat("_MagentaIntensity", 3.4f);
+                m.SetFloat("_MagentaFalloff", 0.092f);
+
+                m.SetColor("_PurpleColor", new Color(0.48f, 0.02f, 1.0f, 1.0f));
+                m.SetFloat("_PurpleIntensity", 2.05f);
+                m.SetFloat("_PurpleFalloff", 0.22f);
+
+                m.SetColor("_BlueColor", new Color(0.02f, 0.18f, 1.0f, 1.0f));
+                m.SetFloat("_BlueIntensity", 0.78f);
+                m.SetFloat("_BlueFalloff", 0.44f);
+
+                m.SetColor("_BloomColor", new Color(0.18f, 0.08f, 1.0f, 1.0f));
+                m.SetFloat("_BloomIntensity", 0.24f);
+                m.SetFloat("_BloomFalloff", 0.70f);
+
+                m.SetColor("_AtmosColor", new Color(0.22f, 0.07f, 0.92f, 1.0f));
+                m.SetFloat("_AtmosIntensity", 0.035f);
+                m.SetFloat("_AtmosFalloff", 1.15f);
+
+                m.SetFloat("_Exposure", 0.36f);
+                m.SetFloat("_WarmAngle", 0.22f);
+                m.SetFloat("_AngleStrength", 0.86f);
+                m.SetFloat("_WarmSharpness", 2.35f);
+                m.SetFloat("_CoolRedCut", 0.08f);
+                m.SetFloat("_WarmBlueCut", 0.72f);
+                m.SetFloat("_Instability", 0.22f);
+
+                EditorUtility.SetDirty(m);
+            }
+
+            VolumeProfile profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(ProfilePath);
+            if (profile != null)
+            {
+                profile.components.Clear();
+                Bloom bloom = profile.Add<Bloom>(true);
+                bloom.active = true;
+                bloom.threshold.Override(1.20f);
+                bloom.intensity.Override(0.62f);
+                bloom.scatter.Override(0.64f);
+                EditorUtility.SetDirty(profile);
+            }
+            FixPostProcessController(0.62f, 0.0f);
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 107: restored separate white HDR core with magenta/blue glow.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 108 - narrow the restored white core.
+        //  Iter107 proved the white-core model, but the core became too wide
+        //  and the broad halo flooded the sphere. Keep the same geometry and
+        //  colour clock, then tighten the source line and surrounding glow.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 108 - Narrow White Core")]
+        public static void Iteration108()
+        {
+            Iteration107();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetColor("_WhiteCoreColor", new Color(1.0f, 0.97f, 1.0f, 1.0f));
+                m.SetFloat("_WhiteCoreIntensity", 70.0f);
+                m.SetFloat("_WhiteCoreFalloff", 0.0068f);
+
+                m.SetFloat("_CoreIntensity", 18.0f);
+                m.SetFloat("_CoreFalloff", 0.015f);
+
+                m.SetFloat("_PinkIntensity", 6.7f);
+                m.SetFloat("_PinkFalloff", 0.028f);
+                m.SetFloat("_MagentaIntensity", 2.55f);
+                m.SetFloat("_MagentaFalloff", 0.076f);
+                m.SetFloat("_PurpleIntensity", 1.70f);
+                m.SetFloat("_PurpleFalloff", 0.175f);
+
+                m.SetFloat("_BlueIntensity", 0.54f);
+                m.SetFloat("_BlueFalloff", 0.32f);
+                m.SetFloat("_BloomIntensity", 0.14f);
+                m.SetFloat("_BloomFalloff", 0.50f);
+                m.SetFloat("_AtmosIntensity", 0.018f);
+                m.SetFloat("_AtmosFalloff", 0.92f);
+
+                m.SetFloat("_Exposure", 0.31f);
+                m.SetFloat("_WarmAngle", 0.18f);
+                m.SetFloat("_AngleStrength", 0.84f);
+                m.SetFloat("_WarmSharpness", 2.25f);
+                m.SetFloat("_Instability", 0.18f);
+
+                EditorUtility.SetDirty(m);
+            }
+
+            VolumeProfile profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(ProfilePath);
+            if (profile != null)
+            {
+                profile.components.Clear();
+                Bloom bloom = profile.Add<Bloom>(true);
+                bloom.active = true;
+                bloom.threshold.Override(1.35f);
+                bloom.intensity.Override(0.46f);
+                bloom.scatter.Override(0.58f);
+                EditorUtility.SetDirty(profile);
+            }
+            FixPostProcessController(0.46f, 0.0f);
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 108: narrowed white HDR core and tightened colour halo.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 109 - final rim colour trim.
+        //  Iter108 is close visually, but the left blue halo and warm red
+        //  shoulder are still heavier than the reference. Trim colour energy
+        //  while preserving the continuous white HDR source line.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 109 - Final Rim Colour Trim")]
+        public static void Iteration109()
+        {
+            Iteration108();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_WhiteCoreIntensity", 64.0f);
+                m.SetFloat("_WhiteCoreFalloff", 0.0062f);
+
+                m.SetColor("_CoreCoolColor", new Color(0.32f, 0.48f, 1.0f, 1.0f));
+                m.SetColor("_CoreColor", new Color(0.92f, 0.60f, 0.88f, 1.0f));
+                m.SetFloat("_CoreIntensity", 16.0f);
+                m.SetFloat("_CoreFalloff", 0.014f);
+
+                m.SetColor("_PinkColor", new Color(0.86f, 0.08f, 0.62f, 1.0f));
+                m.SetFloat("_PinkIntensity", 5.8f);
+                m.SetFloat("_PinkFalloff", 0.026f);
+                m.SetColor("_MagentaColor", new Color(0.76f, 0.00f, 0.86f, 1.0f));
+                m.SetFloat("_MagentaIntensity", 2.15f);
+                m.SetFloat("_MagentaFalloff", 0.070f);
+                m.SetFloat("_PurpleIntensity", 1.55f);
+                m.SetFloat("_PurpleFalloff", 0.160f);
+
+                m.SetColor("_BlueColor", new Color(0.01f, 0.08f, 1.0f, 1.0f));
+                m.SetFloat("_BlueIntensity", 0.42f);
+                m.SetFloat("_BlueFalloff", 0.28f);
+                m.SetColor("_BloomColor", new Color(0.12f, 0.04f, 0.95f, 1.0f));
+                m.SetFloat("_BloomIntensity", 0.11f);
+                m.SetFloat("_BloomFalloff", 0.42f);
+                m.SetFloat("_AtmosIntensity", 0.012f);
+                m.SetFloat("_AtmosFalloff", 0.80f);
+
+                m.SetFloat("_Exposure", 0.32f);
+                m.SetFloat("_WarmAngle", 0.16f);
+                m.SetFloat("_AngleStrength", 0.84f);
+                m.SetFloat("_WarmSharpness", 2.30f);
+                m.SetFloat("_CoolRedCut", 0.06f);
+                m.SetFloat("_WarmBlueCut", 0.76f);
+
+                EditorUtility.SetDirty(m);
+            }
+
+            VolumeProfile profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(ProfilePath);
+            if (profile != null)
+            {
+                profile.components.Clear();
+                Bloom bloom = profile.Add<Bloom>(true);
+                bloom.active = true;
+                bloom.threshold.Override(1.42f);
+                bloom.intensity.Override(0.42f);
+                bloom.scatter.Override(0.55f);
+                EditorUtility.SetDirty(profile);
+            }
+            FixPostProcessController(0.42f, 0.0f);
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 109: trimmed blue/warm halo while preserving the white core.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 110 - add only the missing wide dense rim glow.
+        //  Starts from the saved Iter109 ring and changes no white-core,
+        //  geometry, colour-clock, scene Bloom, backdrop, camera, particles,
+        //  rays, or other scene objects.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 110 - Wide Rim Glow Only")]
+        public static void Iteration110()
+        {
+            LoadScene();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_WideGlowIntensity", 0.28f);
+                m.SetFloat("_WideGlowFalloff", 0.46f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 110: added only a wide dense coloured rim glow.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 111 - shape the wide glow only.
+        //  Keeps the white HDR core untouched by giving the added wide layer
+        //  a tiny inner fade, then extends the falloff outward.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 111 - Wide Glow Shape Only")]
+        public static void Iteration111()
+        {
+            LoadScene();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_WideGlowIntensity", 0.22f);
+                m.SetFloat("_WideGlowFalloff", 0.68f);
+                m.SetFloat("_WideGlowStart", 0.006f);
+                m.SetFloat("_WideGlowRamp", 0.070f);
+                m.SetFloat("_WideGlowPower", 1.18f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 111: shaped only the added wide glow layer.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 112 - final Wide Glow density trim.
+        //  Same isolated layer, lower near-ring density and wider/smoother
+        //  falloff. No core, colour-map, geometry, Bloom, or scene changes.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 112 - Wide Glow Density Trim")]
+        public static void Iteration112()
+        {
+            LoadScene();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_WideGlowIntensity", 0.16f);
+                m.SetFloat("_WideGlowFalloff", 0.72f);
+                m.SetFloat("_WideGlowStart", 0.008f);
+                m.SetFloat("_WideGlowRamp", 0.060f);
+                m.SetFloat("_WideGlowPower", 1.48f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 112: final wide glow density/falloff trim only.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 113 - add DenseSideGlow shoulder only.
+        //  Adds a compact coloured band directly around the white HDR core.
+        //  Does not touch white core, existing WideGlow/SoftGlow, Bloom,
+        //  geometry, colour positions, backdrop, camera, particles, or rays.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 113 - Dense Side Glow Only")]
+        public static void Iteration113()
+        {
+            LoadScene();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_DenseSideGlowIntensity", 1.05f);
+                m.SetFloat("_DenseSideGlowStart", 0.0048f);
+                m.SetFloat("_DenseSideGlowWidth", 0.024f);
+                m.SetFloat("_DenseSideGlowFeather", 0.008f);
+                m.SetFloat("_DenseSideGlowFalloff", 0.018f);
+                m.SetFloat("_DenseSideGlowPower", 0.90f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 113: added only the DenseSideGlow shoulder layer.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 114 - stronger DenseSideGlow shoulder.
+        //  Corrects Iter113 where the shoulder was present but too subtle.
+        //  Only DenseSideGlow parameters change.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 114 - Stronger Dense Side Glow")]
+        public static void Iteration114()
+        {
+            LoadScene();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_DenseSideGlowIntensity", 2.25f);
+                m.SetFloat("_DenseSideGlowStart", 0.0035f);
+                m.SetFloat("_DenseSideGlowWidth", 0.030f);
+                m.SetFloat("_DenseSideGlowFeather", 0.006f);
+                m.SetFloat("_DenseSideGlowFalloff", 0.014f);
+                m.SetFloat("_DenseSideGlowPower", 0.78f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 114: strengthened only the DenseSideGlow shoulder.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 115 - visible DenseSideGlow band.
+        //  The previous dense band was still hidden by the white HDR core.
+        //  Push only the shoulder emission/width so a distinct coloured band
+        //  appears next to the white line.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 115 - Visible Dense Side Glow")]
+        public static void Iteration115()
+        {
+            LoadScene();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_DenseSideGlowIntensity", 5.0f);
+                m.SetFloat("_DenseSideGlowStart", 0.010f);
+                m.SetFloat("_DenseSideGlowWidth", 0.048f);
+                m.SetFloat("_DenseSideGlowFeather", 0.004f);
+                m.SetFloat("_DenseSideGlowFalloff", 0.016f);
+                m.SetFloat("_DenseSideGlowPower", 0.82f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 115: made only the DenseSideGlow band visibly stronger.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 116 - coloured ring underneath WhiteCore.
+        //  Corrects the target from side glow to the coloured under-ring that
+        //  sits directly below the white core. WhiteCore, geometry, colour
+        //  clock, Bloom, WideGlow/soft glow, backdrop and camera stay unchanged.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 116 - Under Ring Glow")]
+        public static void Iteration116()
+        {
+            LoadScene();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                // Disable the prior side-shoulder layer; the requested glow is
+                // the coloured ring underneath the white core, not beside it.
+                m.SetFloat("_DenseSideGlowIntensity", 0.0f);
+
+                m.SetFloat("_UnderRingGlowIntensity", 7.0f);
+                m.SetFloat("_UnderRingGlowFalloff", 0.020f);
+                m.SetFloat("_UnderRingGlowPower", 0.72f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 116: strengthened only the coloured ring under the white core.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        //  Iteration 117 - visible coloured ring under the white contour.
+        //  Iter116 was hidden by the white HDR core. Keep the white core on
+        //  top, but make the coloured under-ring wider/brighter so it peeks
+        //  out around the white contour. No scene/Bloom/geometry changes.
+        // ─────────────────────────────────────────────────────────────────
+        [MenuItem("Tools/AudioVisualizer/Visual Match/Iteration 117 - Visible Under Ring")]
+        public static void Iteration117()
+        {
+            LoadScene();
+
+            Material m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_NeonRingMultiLayer.mat");
+            if (m != null)
+            {
+                m.SetFloat("_DenseSideGlowIntensity", 0.0f);
+                m.SetFloat("_UnderRingGlowIntensity", 22.0f);
+                m.SetFloat("_UnderRingGlowFalloff", 0.042f);
+                m.SetFloat("_UnderRingGlowPower", 0.78f);
+                EditorUtility.SetDirty(m);
+            }
+
+            SaveAll();
+            Debug.Log("[VisualMatch] Iteration 117: made the coloured under-ring visible around the white contour.");
+        }
+
         // ═══════════════════════════════════════════════════════════════
         //  Private helpers
         // ═══════════════════════════════════════════════════════════════

@@ -25,37 +25,54 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _AngleStrength: 0.85
-    - _AtmosFalloff: 1
-    - _AtmosIntensity: 0.05
+    - _AngleStrength: 0.84
+    - _AtmosFalloff: 0.8
+    - _AtmosIntensity: 0.012
     - _BloomFalloff: 0.42
-    - _BloomIntensity: 0.35
-    - _BlueFalloff: 0.15
-    - _BlueIntensity: 1.05
-    - _CoolRedCut: 0.12
+    - _BloomIntensity: 0.11
+    - _BlueFalloff: 0.28
+    - _BlueIntensity: 0.42
+    - _CoolRedCut: 0.06
     - _CoreFalloff: 0.014
-    - _CoreIntensity: 55
-    - _Exposure: 0.34
-    - _Instability: 0.2
-    - _MagentaFalloff: 0.05
-    - _MagentaIntensity: 2.8
-    - _PinkFalloff: 0.014
-    - _PinkIntensity: 9
-    - _PurpleFalloff: 0.12
-    - _PurpleIntensity: 1.7
+    - _CoreIntensity: 16
+    - _DenseSideGlowFalloff: 0.016
+    - _DenseSideGlowFeather: 0.004
+    - _DenseSideGlowIntensity: 0
+    - _DenseSideGlowPower: 0.82
+    - _DenseSideGlowStart: 0.01
+    - _DenseSideGlowWidth: 0.048
+    - _Exposure: 0.32
+    - _Instability: 0.18
+    - _MagentaFalloff: 0.07
+    - _MagentaIntensity: 2.15
+    - _PinkFalloff: 0.026
+    - _PinkIntensity: 5.8
+    - _PurpleFalloff: 0.16
+    - _PurpleIntensity: 1.55
     - _RingCenterX: 0.12
     - _RingCenterY: -0.43
     - _RingRadius: 3.05
-    - _WarmAngle: 0.1
-    - _WarmBlueCut: 0.55
-    - _WarmSharpness: 2.6
+    - _UnderRingGlowFalloff: 0.042
+    - _UnderRingGlowIntensity: 22
+    - _UnderRingGlowPower: 0.78
+    - _WarmAngle: 0.16
+    - _WarmBlueCut: 0.76
+    - _WarmSharpness: 2.3
+    - _WhiteCoreFalloff: 0.0062
+    - _WhiteCoreIntensity: 64
+    - _WideGlowFalloff: 0.72
+    - _WideGlowIntensity: 0.16
+    - _WideGlowPower: 1.48
+    - _WideGlowRamp: 0.06
+    - _WideGlowStart: 0.008
     m_Colors:
-    - _AtmosColor: {r: 0.22, g: 0.1, b: 0.92, a: 1}
-    - _BloomColor: {r: 0.2, g: 0.13, b: 1, a: 1}
-    - _BlueColor: {r: 0.14, g: 0.18, b: 1, a: 1}
-    - _CoreColor: {r: 1, g: 0.74, b: 0.88, a: 1}
-    - _CoreCoolColor: {r: 0.38, g: 0.5, b: 1, a: 1}
-    - _MagentaColor: {r: 1, g: 0.04, b: 0.85, a: 1}
-    - _PinkColor: {r: 1, g: 0.16, b: 0.6, a: 1}
-    - _PurpleColor: {r: 0.5, g: 0.05, b: 1, a: 1}
+    - _AtmosColor: {r: 0.22, g: 0.07, b: 0.92, a: 1}
+    - _BloomColor: {r: 0.12, g: 0.04, b: 0.95, a: 1}
+    - _BlueColor: {r: 0.01, g: 0.08, b: 1, a: 1}
+    - _CoreColor: {r: 0.92, g: 0.6, b: 0.88, a: 1}
+    - _CoreCoolColor: {r: 0.32, g: 0.48, b: 1, a: 1}
+    - _MagentaColor: {r: 0.76, g: 0, b: 0.86, a: 1}
+    - _PinkColor: {r: 0.86, g: 0.08, b: 0.62, a: 1}
+    - _PurpleColor: {r: 0.48, g: 0.02, b: 1, a: 1}
+    - _WhiteCoreColor: {r: 1, g: 0.97, b: 1, a: 1}
   m_BuildTextureStacks: []

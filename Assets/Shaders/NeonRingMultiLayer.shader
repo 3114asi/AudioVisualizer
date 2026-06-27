@@ -22,6 +22,14 @@ Shader "AudioVisualizer/Neon Ring Multi-Layer"
         _CoreCoolColor ("Core Cool Color", Color) = (0.55, 0.78, 1.0, 1.0)
         _CoreIntensity ("Core Intensity", Float) = 45.0
         _CoreFalloff   ("Core Falloff",   Float) = 0.006
+        _WhiteCoreColor     ("White HDR Core Color", Color) = (1.0, 0.96, 1.0, 1.0)
+        _WhiteCoreIntensity ("White HDR Core Intensity", Float) = 82.0
+        _WhiteCoreFalloff   ("White HDR Core Falloff",   Float) = 0.009
+
+        // Coloured emission directly underneath the white HDR core.
+        _UnderRingGlowIntensity ("Under Ring Glow Intensity", Float) = 0.0
+        _UnderRingGlowFalloff   ("Under Ring Glow Falloff",   Float) = 0.018
+        _UnderRingGlowPower     ("Under Ring Glow Power",     Float) = 1.0
 
         // L2 — Hot Pink Core
         _PinkColor     ("Pink Color", Color) = (1.0, 0.22, 0.62, 1.0)
@@ -52,6 +60,21 @@ Shader "AudioVisualizer/Neon Ring Multi-Layer"
         _AtmosColor     ("Atmos Color", Color) = (0.26, 0.16, 0.92, 1.0)
         _AtmosIntensity ("Atmos Intensity", Float) = 0.12
         _AtmosFalloff   ("Atmos Falloff",   Float) = 2.4
+
+        // L8 - dense coloured rim glow, independent from Bloom/post.
+        _WideGlowIntensity ("Wide Glow Intensity", Float) = 0.0
+        _WideGlowFalloff   ("Wide Glow Falloff",   Float) = 0.36
+        _WideGlowStart     ("Wide Glow Start",     Float) = 0.010
+        _WideGlowRamp      ("Wide Glow Ramp",      Float) = 0.055
+        _WideGlowPower     ("Wide Glow Power",     Float) = 1.0
+
+        // L9 - dense coloured shoulder directly around the white core.
+        _DenseSideGlowIntensity ("Dense Side Glow Intensity", Float) = 0.0
+        _DenseSideGlowStart     ("Dense Side Glow Start",     Float) = 0.006
+        _DenseSideGlowWidth     ("Dense Side Glow Width",     Float) = 0.026
+        _DenseSideGlowFeather   ("Dense Side Glow Feather",   Float) = 0.010
+        _DenseSideGlowFalloff   ("Dense Side Glow Falloff",   Float) = 0.020
+        _DenseSideGlowPower     ("Dense Side Glow Power",     Float) = 1.0
 
         // ── Global exposure (quick master brightness) ──
         _Exposure ("Exposure", Float) = 1.0
@@ -92,12 +115,17 @@ Shader "AudioVisualizer/Neon Ring Multi-Layer"
             float _RingCenterX, _RingCenterY, _RingRadius;
 
             half4 _CoreColor, _CoreCoolColor;    float _CoreIntensity,    _CoreFalloff;
+            half4 _WhiteCoreColor; float _WhiteCoreIntensity, _WhiteCoreFalloff;
+            float _UnderRingGlowIntensity, _UnderRingGlowFalloff, _UnderRingGlowPower;
             half4 _PinkColor;    float _PinkIntensity,    _PinkFalloff;
             half4 _MagentaColor; float _MagentaIntensity, _MagentaFalloff;
             half4 _PurpleColor;  float _PurpleIntensity,  _PurpleFalloff;
             half4 _BlueColor;    float _BlueIntensity,    _BlueFalloff;
             half4 _BloomColor;   float _BloomIntensity,   _BloomFalloff;
             half4 _AtmosColor;   float _AtmosIntensity,   _AtmosFalloff;
+            float _WideGlowIntensity, _WideGlowFalloff, _WideGlowStart, _WideGlowRamp, _WideGlowPower;
+            float _DenseSideGlowIntensity, _DenseSideGlowStart, _DenseSideGlowWidth;
+            float _DenseSideGlowFeather, _DenseSideGlowFalloff, _DenseSideGlowPower;
 
             float _Exposure;
             float _WarmAngle, _AngleStrength, _WarmSharpness, _Instability;
@@ -141,15 +169,41 @@ Shader "AudioVisualizer/Neon Ring Multi-Layer"
                 // The bright line hue rotates: blue-white (cool) ↔ pink-white (warm)
                 half4 coreCol = lerp(_CoreCoolColor, _CoreColor, warmth);
 
-                // ── Sum of seven independent additive light layers ──
+                // ── Sum coloured additive light layers around the rim ──
                 half3 col = half3(0,0,0);
                 col += layer(coreCol,       _CoreIntensity,              _CoreFalloff,    ringDist);
+
+                half3 underCool = lerp(_BlueColor.rgb, _PurpleColor.rgb, saturate(warmth * 0.45));
+                half3 underWarm = lerp(_PurpleColor.rgb, _PinkColor.rgb, saturate(warmth));
+                half3 underCol = lerp(underCool, underWarm, warmth);
+                float underRing = pow(saturate(exp(-ringDist / max(_UnderRingGlowFalloff, 1e-6))), max(_UnderRingGlowPower, 0.01));
+                col += underCol * (_UnderRingGlowIntensity * underRing);
+
                 col += layer(_PinkColor,    _PinkIntensity    * pinkW,   _PinkFalloff,    ringDist);
                 col += layer(_MagentaColor, _MagentaIntensity * magentaW,_MagentaFalloff, ringDist);
                 col += layer(_PurpleColor,  _PurpleIntensity,            _PurpleFalloff,  ringDist);
                 col += layer(_BlueColor,    _BlueIntensity    * blueW,   _BlueFalloff,    ringDist);
                 col += layer(_BloomColor,   _BloomIntensity,             _BloomFalloff,   ringDist);
                 col += layer(_AtmosColor,   _AtmosIntensity,             _AtmosFalloff,   ringDist);
+
+                half3 wideCool = lerp(_BlueColor.rgb, _PurpleColor.rgb, saturate(warmth * 0.35));
+                half3 wideWarm = lerp(_PurpleColor.rgb, _PinkColor.rgb, saturate(warmth));
+                half3 wideCol = lerp(wideCool, wideWarm, warmth);
+                float wideStart = smoothstep(_WideGlowStart, _WideGlowStart + max(_WideGlowRamp, 1e-6), ringDist);
+                float wideGlow = exp(-ringDist / max(_WideGlowFalloff, 1e-6)) * wideStart;
+                wideGlow = pow(saturate(wideGlow), max(_WideGlowPower, 0.01));
+                col += wideCol * (_WideGlowIntensity * wideGlow);
+
+                half3 denseCool = lerp(_BlueColor.rgb, _PurpleColor.rgb, saturate(warmth * 0.45));
+                half3 denseWarm = lerp(_PurpleColor.rgb, _PinkColor.rgb, saturate(warmth));
+                half3 denseCol = lerp(denseCool, denseWarm, warmth);
+                float denseIn = smoothstep(_DenseSideGlowStart, _DenseSideGlowStart + max(_DenseSideGlowFeather, 1e-6), ringDist);
+                float denseOut = 1.0 - smoothstep(
+                    _DenseSideGlowStart + _DenseSideGlowWidth,
+                    _DenseSideGlowStart + _DenseSideGlowWidth + max(_DenseSideGlowFalloff, 1e-6),
+                    ringDist);
+                float denseSideGlow = pow(saturate(denseIn * denseOut), max(_DenseSideGlowPower, 0.01));
+                col += denseCol * (_DenseSideGlowIntensity * denseSideGlow);
 
                 // ── Energetic instability: smooth boost on right + top sectors ──
                 float instab = 1.0
@@ -165,6 +219,12 @@ Shader "AudioVisualizer/Neon Ring Multi-Layer"
                 col.r *= lerp(_CoolRedCut, 1.0,         warmth);   // cool = low red → blue
                 col.g *= lerp(0.30,        0.55,        warmth);   // deep, near-zero green (ref is pure blue/magenta)
                 col.b *= lerp(1.0,         _WarmBlueCut, warmth);  // warm = less blue → pink
+
+                // The actual reference rim has a continuous blown-out white
+                // source line. Add it after chroma enforcement so the gradient
+                // surrounds the white core instead of replacing it.
+                half3 whiteCore = layer(_WhiteCoreColor, _WhiteCoreIntensity, _WhiteCoreFalloff, ringDist);
+                col += whiteCore * (0.92 + 0.08 * instab);
 
                 col *= _Exposure;
 
