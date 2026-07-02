@@ -46,9 +46,9 @@ Shader "AudioVisualizer/EnergyRay"
 
                 float rootFade = smoothstep(0.00, 0.10, uv.y);
                 float tipFade = pow(saturate(1.0 - uv.y), 1.45);
-                float broken = 0.72 + 0.28 * sin(uv.y * 28.0 + _Time.y * 7.0);
+                float broken = 0.84 + 0.16 * sin(uv.y * 24.0 + _Time.y * 1.20);
 
-                float rootFlare = exp(-uv.y * 14.0) * exp(-centerDist * centerDist * 3.5) * 0.75;
+                float rootFlare = exp(-uv.y * 16.0) * exp(-centerDist * centerDist * 3.5) * 0.55;
                 float base = (needle + softWing) * rootFade * tipFade * broken + rootFlare;
                 float3 col = _Color.rgb * _Intensity * base;
 

@@ -7,6 +7,8 @@ Shader "AudioVisualizer/Neon Mist Textured Additive"
         _Intensity ("Intensity", Float) = 0.26
         _Softness ("Edge Softness", Range(0.1, 3)) = 1.0
         _DistortStrength ("UV Distortion", Range(0, 0.1)) = 0.03
+        _FreezeTime ("Freeze Time", Float) = 0
+        _StaticTime ("Static Time", Float) = 0
     }
     SubShader
     {
@@ -30,6 +32,8 @@ Shader "AudioVisualizer/Neon Mist Textured Additive"
             half _Intensity;
             half _Softness;
             half _DistortStrength;
+            half _FreezeTime;
+            half _StaticTime;
 
             // Simple hash for UV distortion
             float hash(float2 p)
@@ -41,7 +45,8 @@ Shader "AudioVisualizer/Neon Mist Textured Additive"
             {
                 Varyings output;
                 // Subtle vertex displacement for organic edges
-                float displace = (hash(input.uv * 7.3 + _Time.x * 0.05) - 0.5) * 0.04;
+                float shaderTime = lerp(_Time.x, _StaticTime, saturate(_FreezeTime));
+                float displace = (hash(input.uv * 7.3 + shaderTime * 0.05) - 0.5) * 0.04;
                 input.positionOS.xy += displace;
                 output.positionHCS = UnityObjectToClipPos(input.positionOS);
                 output.uv = TRANSFORM_TEX(input.uv, _MainTex);

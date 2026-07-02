@@ -37,8 +37,8 @@ Shader "AudioVisualizer/InnerEnergySphere"
         _EffectTime ("Effect Time", Float) = 0.0
         _NoiseAmp ("Noise Amplitude", Float) = 0.14
         _NoiseFreq ("Noise Frequency", Float) = 5.5
-        _NoiseSpeed ("Noise Speed", Float) = 0.24
-        _PulseSpeed ("Pulse Speed", Float) = 0.8
+        _NoiseSpeed ("Noise Speed", Float) = 0.12
+        _PulseSpeed ("Pulse Speed", Float) = 0.30
         _PulseAmp ("Pulse Amplitude", Range(0, 0.5)) = 0.12
 
         [Header(Global)]
@@ -109,9 +109,21 @@ Shader "AudioVisualizer/InnerEnergySphere"
                 return smoothstep(width, 0.0, f);
             }
 
+            float seamSafeHarmonic(float freq)
+            {
+                float mag = max(1.0, floor(abs(freq) + 0.5));
+                return freq < 0.0 ? -mag : mag;
+            }
+
+            float periodicLineMask(float phase, float width)
+            {
+                float threshold = cos(saturate(width) * 6.2831853);
+                return smoothstep(threshold, 1.0, -cos(phase));
+            }
+
             half4 frag(V input) : SV_Target
             {
-                float t = _EffectTime + _Time.y;
+                float t = _EffectTime;
                 float2 center = float2(_RingCenterX, _RingCenterY);
                 float2 p = input.wp.xy - center;
                 float r = length(p);
@@ -128,23 +140,27 @@ Shader "AudioVisualizer/InnerEnergySphere"
                 float pulse = 1.0 + _PulseAmp * sin(t * _PulseSpeed)
                             + _PulseAmp * 0.45 * sin(t * _PulseSpeed * 1.9 + 1.1);
 
-                float wave1 = sin(a * _Layer1Freq + nr * 13.0 - t * _Layer1Speed * 6.283 + warp * 5.0);
-                float wave2 = sin(a * _Layer2Freq - nr * 18.0 - t * _Layer2Speed * 6.283 + warp * 4.0);
-                float wave3 = sin(a * _Layer3Freq + nr * 23.0 - t * _Layer3Speed * 6.283 + warp * 6.0);
+                float f1 = seamSafeHarmonic(_Layer1Freq);
+                float f2 = seamSafeHarmonic(_Layer2Freq);
+                float f3 = seamSafeHarmonic(_Layer3Freq);
+                float wave1 = sin(a * f1 + nr * 13.0 - t * _Layer1Speed * 6.283 + warp * 5.0);
+                float wave2 = sin(a * f2 - nr * 18.0 - t * _Layer2Speed * 6.283 + warp * 4.0);
+                float wave3 = sin(a * f3 + nr * 23.0 - t * _Layer3Speed * 6.283 + warp * 6.0);
 
                 float membrane1 = smoothstep(0.84, 1.0, wave1 * 0.5 + 0.5) * edge;
                 float membrane2 = smoothstep(0.88, 1.0, wave2 * 0.5 + 0.5) * smoothstep(0.20, 0.92, nr);
                 float membrane3 = smoothstep(0.91, 1.0, wave3 * 0.5 + 0.5) * smoothstep(0.55, 0.98, nr);
 
-                float polarGrid = lineMask(a / 6.2831853 * _GridFreq + t * 0.015, 0.018)
-                                + lineMask(nr * _GridFreq * 0.80 - t * 0.030, 0.022);
+                float gridFreq = seamSafeHarmonic(_GridFreq);
+                float polarGrid = periodicLineMask(a * gridFreq + t * 0.007 * 6.2831853, 0.018)
+                                + lineMask(nr * _GridFreq * 0.80 - t * 0.014, 0.022);
                 polarGrid *= smoothstep(0.28, 0.95, nr) * (0.20 + 0.45 * n);
 
                 float2 cell = floor((p / _InnerRadius) * 42.0 + 100.0);
                 float2 local = frac((p / _InnerRadius) * 42.0 + 100.0) - 0.5;
                 float dotGate = step(0.895, hash(cell));
                 float dotFade = exp(-dot(local, local) * 185.0);
-                float twinkle = 0.45 + 0.55 * sin(t * 3.7 + hash(cell + 19.0) * 6.283);
+                float twinkle = 0.45 + 0.55 * sin(t * 1.15 + hash(cell + 19.0) * 6.283);
                 float dots = dotGate * dotFade * twinkle * smoothstep(0.18, 0.92, nr) * (1.0 - smoothstep(0.97, 1.0, nr));
 
                 float warm = saturate(max(pow(saturate((cos(a - 0.25) + 1.0) * 0.5), 1.8),

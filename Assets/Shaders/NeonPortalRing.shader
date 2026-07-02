@@ -7,6 +7,8 @@ Shader "AudioVisualizer/Neon Portal Ring Additive"
         _Intensity ("Intensity", Float) = 3
         _Pulse ("Pulse", Float) = 1
         _FlowOffset ("Flow Offset", Float) = 0
+        _FreezeTime ("Freeze Time", Float) = 0
+        _StaticTime ("Static Time", Float) = 0
         _NoiseStrength ("Noise Strength", Range(0, 1)) = 0.25
         _SegmentContrast ("Segment Contrast", Range(0, 6)) = 2.5
     }
@@ -31,6 +33,8 @@ Shader "AudioVisualizer/Neon Portal Ring Additive"
             half _Intensity;
             half _Pulse;
             half _FlowOffset;
+            half _FreezeTime;
+            half _StaticTime;
             half _NoiseStrength;
             half _SegmentContrast;
 
@@ -61,7 +65,8 @@ Shader "AudioVisualizer/Neon Portal Ring Additive"
                 float core = 1.0 - abs(input.uv.y - 0.5) * 2.0;
                 float fresnel = pow(saturate(1.0 - core), 2.5) + pow(saturate(core), 7.0) * 2.0;
                 float segments = pow(saturate(sin((angle + _FlowOffset) * 37.699) * 0.5 + 0.5), _SegmentContrast);
-                float sparks = step(0.955, hash(float2(floor((angle + _FlowOffset) * 170.0), floor(_Time.y * 18.0))));
+                float shaderTime = lerp(_Time.y, _StaticTime, saturate(_FreezeTime));
+                float sparks = step(0.955, hash(float2(floor((angle + _FlowOffset) * 170.0), floor(shaderTime * 18.0))));
                 float alpha = saturate(0.25 + fresnel + segments * 1.2 + sparks * 3.0);
                 return color * (_Intensity * _Pulse * alpha);
             }

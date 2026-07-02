@@ -6,6 +6,7 @@ namespace Ediskrad.AudioVisualizer
     public sealed class EnergyHotspotSystem : MonoBehaviour
     {
         [Header("Links")]
+        public EnergySphereController controller;
         public EnergyRayBurstSystem linkedRays;
 
         [Header("Hotspots")]
@@ -13,14 +14,14 @@ namespace Ediskrad.AudioVisualizer
         public float sphereRadius = 2.0f;
         public float hotspotSizeMin = 0.12f;
         public float hotspotSizeMax = 0.34f;
-        public float hotspotIntensity = 9.2f;
+        public float hotspotIntensity = 6.0f;
 
         [Header("Timing")]
-        public float flashDuration = 0.42f;
-        public float intervalMin = 0.10f;
-        public float intervalMax = 0.48f;
+        public float flashDuration = 1.05f;
+        public float intervalMin = 0.45f;
+        public float intervalMax = 1.25f;
         public int flashesPerEventMin = 1;
-        public int flashesPerEventMax = 3;
+        public int flashesPerEventMax = 2;
 
         [Header("Preferred Regions (degrees)")]
         public float[] preferredAngles = { 0f, 18f, 45f, 86f, 185f, 222f, 270f, 318f };
@@ -44,19 +45,22 @@ namespace Ediskrad.AudioVisualizer
         private void OnEnable()
         {
             EnsureInitialized();
-            ScheduleNext(0.08f);
+            EnsureController();
+            ScheduleNext(0.22f);
         }
 
         private void Update()
         {
             EnsureInitialized();
+            EnsureController();
 
-            if (Time.time >= nextFlashTime)
+            float envelope = controller != null ? controller.CurrentEnvelope : 1.0f;
+            if (Time.time >= nextFlashTime && envelope > 0.08f)
             {
                 int count = Random.Range(flashesPerEventMin, flashesPerEventMax + 1);
                 float baseAngle = PickAngle();
                 for (int i = 0; i < count; i++)
-                    FlashAtAngle(baseAngle + Random.Range(-14f, 14f), 1.0f + i * 0.15f);
+                    FlashAtAngle(baseAngle + Random.Range(-14f, 14f), Mathf.Lerp(0.35f, 1.0f, envelope) * (1.0f + i * 0.12f));
 
                 ScheduleNext();
             }
@@ -96,6 +100,7 @@ namespace Ediskrad.AudioVisualizer
         public void PreviewAtTime(float time)
         {
             EnsureInitialized();
+            EnsureController();
 
             foreach (Hotspot h in hotspots)
             {
@@ -103,17 +108,23 @@ namespace Ediskrad.AudioVisualizer
                 SetVisible(h, false);
             }
 
+            float envelope = controller != null ? controller.EvaluateEnvelope(time) : 1.0f;
+            float rayScale = 1.0f;
             float[] previewAngles = { 0f, 34f, 82f, 188f, 226f, 270f, 314f };
             int visible = Mathf.Min(previewAngles.Length, hotspots.Count);
             for (int i = 0; i < visible; i++)
             {
-                float phase = Mathf.Repeat(time * 0.45f + i * 0.17f, 1.0f);
-                if (phase > 0.70f && i > 2)
+                float cycle = Mathf.Lerp(2.6f, 4.8f, Hash01(i * 11.17f + 3.0f));
+                float phase = Mathf.Repeat(time / cycle + i * 0.151f, 1.0f);
+                float hEnvelope = SmoothPulse(phase, 0.18f, 0.52f, 1.0f) * envelope;
+                if (hEnvelope <= 0.01f)
                     continue;
 
                 Hotspot h = hotspots[i];
-                ConfigureHotspot(h, previewAngles[i] + Mathf.Sin(time * 1.2f + i) * 6f,
-                    Mathf.Lerp(0.75f, 1.35f, Mathf.Sin(time + i * 0.6f) * 0.5f + 0.5f));
+                ConfigurePreviewHotspot(h, previewAngles[i] + Mathf.Sin(time * 0.55f + i) * 5f,
+                    Mathf.Lerp(0.72f, 1.22f, Hash01(i * 7.3f)) * Mathf.Lerp(0.25f, 1.0f, envelope) * rayScale,
+                    Hash01(i * 13.5f + 0.7f),
+                    Hash01(i * 17.2f + 1.2f));
                 h.active = true;
                 h.age = phase * h.lifetime;
                 SetVisible(h, true);
@@ -231,8 +242,8 @@ namespace Ediskrad.AudioVisualizer
             h.go.transform.localRotation = Quaternion.Euler(0f, 0f, angleDeg);
 
             h.baseSize = Random.Range(hotspotSizeMin, hotspotSizeMax) * Mathf.Lerp(0.85f, 1.25f, intensityScale - 1f);
-            h.baseIntensity = hotspotIntensity * intensityScale * Random.Range(0.75f, 1.35f);
-            h.lifetime = flashDuration * Random.Range(0.55f, 1.35f);
+            h.baseIntensity = hotspotIntensity * intensityScale * GetRayIntensityScale() * Random.Range(0.75f, 1.25f);
+            h.lifetime = flashDuration * Random.Range(0.85f, 1.35f);
 
             Color c = ColorForAngle(angleDeg);
             h.renderer.GetPropertyBlock(h.mpb);
@@ -242,10 +253,28 @@ namespace Ediskrad.AudioVisualizer
             h.renderer.SetPropertyBlock(h.mpb);
         }
 
+        private void ConfigurePreviewHotspot(Hotspot h, float angleDeg, float intensityScale, float sizeSeed, float falloffSeed)
+        {
+            float rad = angleDeg * Mathf.Deg2Rad;
+            Vector3 pos = new Vector3(Mathf.Cos(rad), Mathf.Sin(rad), 0f) * sphereRadius;
+            h.go.transform.localPosition = pos;
+            h.go.transform.localRotation = Quaternion.Euler(0f, 0f, angleDeg);
+
+            h.baseSize = Mathf.Lerp(hotspotSizeMin, hotspotSizeMax, sizeSeed) * Mathf.Lerp(0.82f, 1.18f, intensityScale);
+            h.baseIntensity = hotspotIntensity * intensityScale * GetRayIntensityScale();
+            h.lifetime = flashDuration * Mathf.Lerp(0.92f, 1.28f, sizeSeed);
+
+            Color c = ColorForAngle(angleDeg);
+            h.renderer.GetPropertyBlock(h.mpb);
+            h.mpb.SetColor("_Color", c);
+            h.mpb.SetFloat("_Intensity", h.baseIntensity);
+            h.mpb.SetFloat("_Falloff", Mathf.Lerp(2.6f, 5.0f, falloffSeed));
+            h.renderer.SetPropertyBlock(h.mpb);
+        }
+
         private void UpdateHotspotVisual(Hotspot h, float age01)
         {
-            float envelope = Mathf.Sin(age01 * Mathf.PI);
-            envelope *= Mathf.Lerp(1.0f, 0.45f, age01);
+            float envelope = SmoothPulse(age01, 0.16f, 0.50f, 1.0f);
 
             h.renderer.GetPropertyBlock(h.mpb);
             h.mpb.SetFloat("_Intensity", h.baseIntensity * envelope);
@@ -285,6 +314,36 @@ namespace Ediskrad.AudioVisualizer
         {
             float minDelay = minDelayOverride >= 0f ? minDelayOverride : intervalMin;
             nextFlashTime = Time.time + Random.Range(minDelay, intervalMax);
+        }
+
+        private void EnsureController()
+        {
+            if (controller == null)
+                controller = GetComponentInParent<EnergySphereController>();
+        }
+
+        private float GetRayIntensityScale()
+        {
+            return controller != null ? controller.rayIntensity : 1.0f;
+        }
+
+        private static float Smooth01(float x)
+        {
+            x = Mathf.Clamp01(x);
+            return x * x * (3.0f - 2.0f * x);
+        }
+
+        private static float SmoothPulse(float phase, float attackEnd, float holdEnd, float releaseEnd)
+        {
+            float attack = Smooth01(Mathf.InverseLerp(0.0f, attackEnd, phase));
+            float release = 1.0f - Smooth01(Mathf.InverseLerp(holdEnd, releaseEnd, phase));
+            return Mathf.Clamp01(Mathf.Min(attack, release));
+        }
+
+        private static float Hash01(float value)
+        {
+            float h = Mathf.Sin(value * 12.9898f) * 43758.5453f;
+            return h - Mathf.Floor(h);
         }
     }
 }

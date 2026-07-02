@@ -4,9 +4,12 @@ namespace Ediskrad.AudioVisualizer
 {
     public sealed class EnergyAtmosphereParticles : MonoBehaviour
     {
+        [Header("Links")]
+        public EnergySphereController controller;
+
         [Header("Settings")]
         public int maxParticles = 220;
-        public float emissionRate = 34f;
+        public float emissionRate = 22f;
         public float sphereRadius = 2.0f;
         public float spreadRadius = 3.05f;
 
@@ -25,6 +28,16 @@ namespace Ediskrad.AudioVisualizer
         private void OnEnable()
         {
             EnsureInitialized();
+            EnsureController();
+        }
+
+        private void Update()
+        {
+            EnsureInitialized();
+            EnsureController();
+            float envelope = controller != null ? controller.CurrentEnvelope : 1.0f;
+            var emission = ps.emission;
+            emission.rateOverTime = emissionRate * Mathf.Lerp(0.18f, 1.0f, Smooth01(envelope));
         }
 
         public void EnsureInitialized()
@@ -39,8 +52,12 @@ namespace Ediskrad.AudioVisualizer
         public void PreviewAtTime(float time)
         {
             EnsureInitialized();
+            EnsureController();
             ps.Clear(true);
             ps.Simulate(Mathf.Max(0.1f, time), true, true, true);
+
+            float envelope = controller != null ? controller.EvaluateEnvelope(time) : 1.0f;
+            ScaleExistingParticles(envelope);
         }
 
         private void CreatePS()
@@ -70,6 +87,8 @@ namespace Ediskrad.AudioVisualizer
             velocity.enabled = true;
             velocity.space = ParticleSystemSimulationSpace.Local;
             velocity.radial = new ParticleSystem.MinMaxCurve(-0.02f, 0.07f);
+            velocity.orbitalX = new ParticleSystem.MinMaxCurve(0.0f, 0.0f);
+            velocity.orbitalY = new ParticleSystem.MinMaxCurve(0.0f, 0.0f);
             velocity.orbitalZ = new ParticleSystem.MinMaxCurve(-0.045f, 0.045f);
 
             var sizeOverLT = ps.sizeOverLifetime;
@@ -124,6 +143,37 @@ namespace Ediskrad.AudioVisualizer
             m.SetInt("_ZWrite", 0);
             m.renderQueue = 3030;
             return m;
+        }
+
+        private void ScaleExistingParticles(float envelope)
+        {
+            int count = ps.particleCount;
+            if (count == 0)
+                return;
+
+            ParticleSystem.Particle[] particles = new ParticleSystem.Particle[count];
+            int actual = ps.GetParticles(particles);
+            float alphaScale = Smooth01(envelope);
+            for (int i = 0; i < actual; i++)
+            {
+                Color32 c = particles[i].startColor;
+                c.a = (byte)Mathf.Clamp(Mathf.RoundToInt(c.a * alphaScale), 0, 255);
+                particles[i].startColor = c;
+            }
+
+            ps.SetParticles(particles, actual);
+        }
+
+        private void EnsureController()
+        {
+            if (controller == null)
+                controller = GetComponentInParent<EnergySphereController>();
+        }
+
+        private static float Smooth01(float x)
+        {
+            x = Mathf.Clamp01(x);
+            return x * x * (3.0f - 2.0f * x);
         }
     }
 }

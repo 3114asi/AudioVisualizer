@@ -11,8 +11,11 @@ namespace Ediskrad.AudioVisualizer.Editor
     public static class EnergySphereBuilder
     {
         private const string ScenePath = "Assets/Scenes/EnergySphereScene.unity";
+        private const string VideoFramesPath = "ref/energy_sphere_video_frames";
         private const int CaptureWidth = 1152;
         private const int CaptureHeight = 1760;
+        private const int VideoFps = 30;
+        private const float VideoDurationSeconds = 10.0f;
 
         [MenuItem("Tools/AudioVisualizer/Energy Sphere/Build Scene")]
         public static void BuildScene()
@@ -103,6 +106,37 @@ namespace Ediskrad.AudioVisualizer.Editor
             CapturePreviewSequence();
         }
 
+        [MenuItem("Tools/AudioVisualizer/Energy Sphere/Export 10s Video Frames")]
+        public static void ExportTenSecondVideoFrames()
+        {
+            EnsureScene();
+            Camera cam = Object.FindObjectOfType<Camera>();
+            if (cam == null)
+            {
+                Debug.LogWarning("[EnergySphere] Camera not found");
+                return;
+            }
+
+            ResetDirectory(VideoFramesPath);
+
+            int frameCount = Mathf.RoundToInt(VideoDurationSeconds * VideoFps);
+            for (int i = 0; i < frameCount; i++)
+            {
+                float time = i / (float)VideoFps;
+                PreparePreview(time);
+                RenderToFile(cam, $"{VideoFramesPath}/frame_{i:0000}.png", CaptureWidth, CaptureHeight);
+            }
+
+            Debug.Log($"[EnergySphere] Video frames saved: {VideoFramesPath}/frame_0000..{frameCount - 1:0000}.png");
+        }
+
+        [MenuItem("Tools/AudioVisualizer/Energy Sphere/Build + Export 10s Video Frames")]
+        public static void BuildAndExportTenSecondVideoFrames()
+        {
+            BuildScene();
+            ExportTenSecondVideoFrames();
+        }
+
         private static void EnsureScene()
         {
             if (!File.Exists(ScenePath))
@@ -130,6 +164,22 @@ namespace Ediskrad.AudioVisualizer.Editor
                 atmosphere.PreviewAtTime(time);
 
             SceneView.RepaintAll();
+        }
+
+        private static void ResetDirectory(string path)
+        {
+            string fullPath = Path.GetFullPath(path);
+            string refRoot = Path.GetFullPath("ref");
+            if (!fullPath.StartsWith(refRoot))
+            {
+                Debug.LogError("[EnergySphere] Refusing to reset directory outside ref/: " + fullPath);
+                return;
+            }
+
+            if (Directory.Exists(fullPath))
+                Directory.Delete(fullPath, true);
+
+            Directory.CreateDirectory(fullPath);
         }
 
         private static void RenderToFile(Camera cam, string path, int w, int h)

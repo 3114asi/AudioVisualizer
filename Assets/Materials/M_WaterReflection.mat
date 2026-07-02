@@ -25,7 +25,7 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Intensity: 1.15
+    - _Intensity: 0.34
     - _Ripple: 0
     - _Width: 0.16
     m_Colors:

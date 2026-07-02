@@ -29,14 +29,16 @@ Shader "AudioVisualizer/EnergySphereRing"
         _WarmAngle ("Warm Angle", Float) = 0.28
         _WarmSharpness ("Warm Sharpness", Float) = 1.65
         _AngleStrength ("Angle Strength", Range(0,1)) = 0.85
+        _BlueColorWeight ("Blue Color Weight", Range(0,1.5)) = 1.05
+        _PinkColorWeight ("Pink Color Weight", Range(0,1.5)) = 0.88
 
         [Header(Motion)]
         _EffectTime ("Effect Time", Float) = 0.0
-        _PulseAmp ("Pulse Amp", Range(0,0.20)) = 0.026
-        _PulseSpeed ("Pulse Speed", Float) = 1.15
+        _PulseAmp ("Pulse Amp", Range(0,0.20)) = 0.018
+        _PulseSpeed ("Pulse Speed", Float) = 0.55
         _NoiseAmp ("Noise Amp", Float) = 0.018
         _NoiseFreq ("Noise Freq", Float) = 5.0
-        _NoiseSpeed ("Noise Speed", Float) = 0.32
+        _NoiseSpeed ("Noise Speed", Float) = 0.18
 
         [Header(Hotspots)]
         _HotspotWidth ("Hotspot Angular Width", Float) = 0.090
@@ -89,6 +91,7 @@ Shader "AudioVisualizer/EnergySphereRing"
             float _CoreIntensity, _GlowIntensity, _HaloIntensity, _AtmosIntensity, _Exposure;
             half4 _CoolColor, _BlueColor, _VioletColor, _WarmColor, _CoreColor;
             float _WarmAngle, _WarmSharpness, _AngleStrength;
+            float _BlueColorWeight, _PinkColorWeight;
             float _EffectTime, _PulseAmp, _PulseSpeed, _NoiseAmp, _NoiseFreq, _NoiseSpeed;
             float _HotspotWidth, _HotspotIntensity;
             float _HotspotAngle0, _HotspotAngle1, _HotspotAngle2, _HotspotAngle3, _HotspotAngle4, _HotspotAngle5;
@@ -134,15 +137,15 @@ Shader "AudioVisualizer/EnergySphereRing"
 
             half4 frag(V input) : SV_Target
             {
-                float t = _EffectTime + _Time.y;
+                float t = _EffectTime;
                 float2 center = float2(_RingCenterX, _RingCenterY);
                 float2 toPixel = input.wp.xy - center;
                 float distFromCenter = length(toPixel);
                 float angle = atan2(toPixel.y, toPixel.x);
 
-                float lowWave = sin(angle * 3.0 - t * 0.55) * 0.50
-                              + sin(angle * 5.0 + t * 0.37) * 0.30
-                              + sin(angle * 9.0 - t * 0.73) * 0.12;
+                float lowWave = sin(angle * 3.0 - t * 0.26) * 0.50
+                              + sin(angle * 5.0 + t * 0.19) * 0.30
+                              + sin(angle * 9.0 - t * 0.33) * 0.12;
                 float steppedNoise = noise1(angle * _NoiseFreq + t * _NoiseSpeed)
                                    + noise1(angle * (_NoiseFreq * 1.9) - t * (_NoiseSpeed * 0.65)) * 0.45;
                 float irregular = (lowWave * 0.45 + steppedNoise - 0.70);
@@ -154,16 +157,19 @@ Shader "AudioVisualizer/EnergySphereRing"
                 float radius = _RingRadius * pulse + irregular * _NoiseAmp;
                 float ringDist = abs(distFromCenter - radius);
 
-                float rightWarm = pow(saturate((cos(angle - _WarmAngle) + 1.0) * 0.5), max(_WarmSharpness, 0.05));
-                float topWarm = pow(saturate((sin(angle) + 1.0) * 0.5), 2.2) * 0.40;
-                float warm = saturate(max(rightWarm, topWarm) * _AngleStrength);
+                float warmCenter = _WarmAngle - 0.12;
+                float warmDelta = angularDistance(angle, warmCenter);
+                float warmCore = 1.0 - smoothstep(0.38, 1.18, warmDelta);
+                float warmShoulder = 1.0 - smoothstep(1.18, 1.58, warmDelta);
+                float warm = saturate((warmCore + warmShoulder * 0.30) * _AngleStrength);
 
                 float leftCool = pow(saturate((cos(angle - 3.14159) + 1.0) * 0.5), 1.15);
                 float bottomCool = pow(saturate((-sin(angle) + 1.0) * 0.5), 1.85) * 0.85;
                 float cool = saturate(max(leftCool, bottomCool));
 
-                half3 coolCol = lerp(_BlueColor.rgb, _CoolColor.rgb, bottomCool * 0.65 + leftCool * 0.35);
-                half3 chroma = lerp(coolCol, _WarmColor.rgb, warm);
+                half3 coolCol = lerp(_BlueColor.rgb, _CoolColor.rgb, bottomCool * 0.65 + leftCool * 0.35) * _BlueColorWeight;
+                half3 warmCol = _WarmColor.rgb * _PinkColorWeight;
+                half3 chroma = lerp(coolCol, warmCol, warm);
                 chroma = lerp(chroma, _VioletColor.rgb, saturate((warm * cool) * 0.55));
 
                 float h = 0.0;
@@ -190,18 +196,17 @@ Shader "AudioVisualizer/EnergySphereRing"
                 col += chroma * (_HaloIntensity * halo * (0.65 + cool * 0.35 + warm * 0.30));
                 col += lerp(_BlueColor.rgb, _VioletColor.rgb, warm * 0.6) * (_AtmosIntensity * atmos);
 
-                float rimRipple = 0.5 + 0.5 * sin(angle * 34.0 + t * 4.3 + noise1(angle * 11.0) * 6.0);
-                col += chroma * filament * rimRipple * 1.2;
+                float rimRipple = 0.5 + 0.5 * sin(angle * 34.0 + t * 1.15 + noise1(angle * 11.0) * 6.0);
+                col += chroma * filament * rimRipple * 1.0;
                 col += _CoreColor.rgb * h * _HotspotIntensity * ringLayer(ringDist, _CoreWidth * 3.0);
 
                 float sparkCell = floor((angle + 3.14159) * 36.0);
-                float sparkClock = floor(t * 7.0);
-                float sparkRand = hash(sparkCell + sparkClock * 19.37);
-                float sparkGate = step(0.885, sparkRand);
-                float sparkAge = frac(t * 2.9 + hash(sparkCell + 5.1));
-                float sparkEnv = sin(sparkAge * 3.14159) * step(sparkAge, 0.76);
+                float sparkRand = hash(sparkCell + 9.37);
+                float sparkGate = smoothstep(0.80, 0.98, sparkRand);
+                float sparkAge = frac(t * 0.46 + hash(sparkCell + 5.1));
+                float sparkEnv = smoothstep(0.0, 0.20, sparkAge) * (1.0 - smoothstep(0.48, 1.0, sparkAge));
                 float sparkBand = exp(-ringDist / 0.018) * (0.65 + 0.35 * h);
-                col += chroma * sparkGate * sparkEnv * sparkBand * 2.8;
+                col += chroma * sparkGate * sparkEnv * sparkBand * 1.65;
 
                 col *= innerMask * outsideMask * _Exposure;
                 col.g *= lerp(0.72, 0.18, warm);

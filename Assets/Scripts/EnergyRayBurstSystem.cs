@@ -5,6 +5,9 @@ namespace Ediskrad.AudioVisualizer
 {
     public sealed class EnergyRayBurstSystem : MonoBehaviour
     {
+        [Header("Links")]
+        public EnergySphereController controller;
+
         [Header("Pool")]
         public int rayCount = 34;
         public float sphereRadius = 2.0f;
@@ -14,13 +17,13 @@ namespace Ediskrad.AudioVisualizer
         public float rayWidthMax = 0.020f;
 
         [Header("Burst Timing")]
-        public float burstIntervalMin = 0.08f;
-        public float burstIntervalMax = 0.24f;
+        public float burstIntervalMin = 0.28f;
+        public float burstIntervalMax = 0.95f;
         public int burstCountMin = 1;
-        public int burstCountMax = 4;
-        public float flashDuration = 0.30f;
-        public float maxIntensity = 7.2f;
-        public float longRayChance = 0.08f;
+        public int burstCountMax = 3;
+        public float flashDuration = 1.10f;
+        public float maxIntensity = 5.6f;
+        public float longRayChance = 0.06f;
 
         [Header("Preferred Angles (degrees)")]
         public float[] preferredAngles = { 0f, 14f, -18f, 178f, 205f, 232f, 84f, 268f, 318f };
@@ -44,19 +47,22 @@ namespace Ediskrad.AudioVisualizer
         private void OnEnable()
         {
             EnsureInitialized();
-            ScheduleNext(0.05f);
+            EnsureController();
+            ScheduleNext(0.18f);
         }
 
         private void Update()
         {
             EnsureInitialized();
+            EnsureController();
 
-            if (Time.time >= nextBurstTime)
+            float envelope = controller != null ? controller.CurrentEnvelope : 1.0f;
+            if (Time.time >= nextBurstTime && envelope > 0.08f)
             {
                 int count = Random.Range(burstCountMin, burstCountMax + 1);
                 float angle = PickWeightedAngle();
                 for (int i = 0; i < count; i++)
-                    FireRayAt(angle + Random.Range(-15f, 15f), 1.0f, 1.0f);
+                    FireRayAt(angle + Random.Range(-15f, 15f), Mathf.Lerp(0.35f, 1.0f, envelope), 1.0f);
 
                 ScheduleNext();
             }
@@ -82,15 +88,22 @@ namespace Ediskrad.AudioVisualizer
         public void FireBurstAroundAngle(float angleDeg, int count, float intensityScale)
         {
             EnsureInitialized();
+            EnsureController();
+
+            float envelope = controller != null ? controller.CurrentEnvelope : 1.0f;
+            if (envelope <= 0.08f)
+                return;
+
             for (int i = 0; i < count; i++)
             {
-                FireRayAt(angleDeg + Random.Range(-10f, 10f), intensityScale, Random.Range(0.75f, 1.25f));
+                FireRayAt(angleDeg + Random.Range(-10f, 10f), intensityScale * Mathf.Lerp(0.35f, 1.0f, envelope), Random.Range(0.85f, 1.25f));
             }
         }
 
         public void PreviewAtTime(float time)
         {
             EnsureInitialized();
+            EnsureController();
 
             foreach (RayInstance r in rays)
             {
@@ -98,22 +111,29 @@ namespace Ediskrad.AudioVisualizer
                 SetRayVisible(r, false);
             }
 
-            float[] previewAngles = { 0f, 11f, 176f, 204f, 231f, 82f, 270f, 318f };
+            float envelope = controller != null ? controller.EvaluateEnvelope(time) : 1.0f;
+            float intensity = 1.0f;
+            float[] previewAngles = { 0f, 13f, 178f, 206f, 234f, 82f, 270f, 318f };
             int visible = Mathf.Min(previewAngles.Length, rays.Count);
             for (int i = 0; i < visible; i++)
             {
-                float phase = Mathf.Repeat(time * 0.37f + i * 0.143f, 1.0f);
-                if (phase > 0.72f && i > 2)
+                float cycle = Mathf.Lerp(2.4f, 4.6f, Hash01(i * 17.23f + 1.7f));
+                float phase = Mathf.Repeat(time / cycle + i * 0.137f, 1.0f);
+                float rayEnvelope = SmoothPulse(phase, 0.16f, 0.42f, 1.0f) * envelope;
+                if (rayEnvelope <= 0.01f)
                     continue;
 
-                float age01 = Mathf.Repeat(phase * 1.35f, 1.0f);
-                ConfigureRay(rays[i], previewAngles[i] + Mathf.Sin(time * 1.7f + i) * 8f,
-                    Mathf.Lerp(0.70f, 1.15f, Mathf.Sin(time + i) * 0.5f + 0.5f),
-                    Mathf.Lerp(0.75f, 1.3f, age01));
+                float age01 = phase;
+                float drift = Mathf.Sin(time * 0.54f + i * 1.37f) * 5.5f;
+                ConfigurePreviewRay(rays[i], previewAngles[i] + drift,
+                    Mathf.Lerp(0.55f, 1.15f, Hash01(i * 9.71f)) * intensity * Mathf.Lerp(0.25f, 1.0f, envelope),
+                    Mathf.Lerp(0.90f, 1.30f, Hash01(i * 3.91f)),
+                    Hash01(i * 2.13f + 0.4f),
+                    Hash01(i * 5.17f + 4.0f));
                 rays[i].active = true;
                 rays[i].age = age01 * rays[i].lifetime;
                 SetRayVisible(rays[i], true);
-                UpdateRayVisual(rays[i], age01);
+                UpdateRayVisual(rays[i], age01, rayEnvelope);
             }
         }
 
@@ -226,15 +246,19 @@ namespace Ediskrad.AudioVisualizer
 
         private void UpdateRayVisual(RayInstance r, float age01)
         {
-            float envelope = Mathf.Sin((1f - age01) * Mathf.PI) * Mathf.Pow(1f - age01, 0.8f);
-            envelope = Mathf.Clamp01(envelope);
+            float envelope = SmoothPulse(age01, 0.18f, 0.46f, 1.0f);
+            UpdateRayVisual(r, age01, envelope);
+        }
 
+        private void UpdateRayVisual(RayInstance r, float age01, float envelope)
+        {
+            envelope = Mathf.Clamp01(envelope);
             r.renderer.GetPropertyBlock(r.mpb);
             r.mpb.SetFloat("_Intensity", r.baseIntensity * envelope);
             r.renderer.SetPropertyBlock(r.mpb);
 
             Vector3 ls = r.go.transform.localScale;
-            ls.y = Mathf.Lerp(r.startLength * 0.28f, r.startLength, envelope);
+            ls.y = Mathf.Lerp(r.startLength * 0.22f, r.startLength, Smooth01(envelope));
             r.go.transform.localScale = ls;
         }
 
@@ -269,14 +293,44 @@ namespace Ediskrad.AudioVisualizer
 
             ray.renderer.GetPropertyBlock(ray.mpb);
             ray.mpb.SetColor("_Color", color);
-            ray.mpb.SetFloat("_Intensity", maxIntensity * intensityScale);
+            ray.mpb.SetFloat("_Intensity", maxIntensity * intensityScale * GetRayIntensityScale());
             ray.mpb.SetFloat("_Length", length);
             ray.mpb.SetFloat("_Width", width);
             ray.mpb.SetFloat("_Softness", Random.Range(2.4f, 5.5f));
             ray.renderer.SetPropertyBlock(ray.mpb);
 
-            ray.lifetime = flashDuration * Random.Range(0.55f, 1.45f) * lifetimeScale;
-            ray.baseIntensity = maxIntensity * intensityScale * (longRay ? 0.85f : 1.0f);
+            ray.lifetime = flashDuration * Random.Range(0.78f, 1.45f) * lifetimeScale;
+            ray.baseIntensity = maxIntensity * intensityScale * GetRayIntensityScale() * (longRay ? 0.85f : 1.0f);
+            ray.startLength = length;
+        }
+
+        private void ConfigurePreviewRay(RayInstance ray, float angleDeg, float intensityScale, float lifetimeScale, float lengthSeed, float widthSeed)
+        {
+            float rad = angleDeg * Mathf.Deg2Rad;
+            Vector3 dir = new Vector3(Mathf.Cos(rad), Mathf.Sin(rad), 0f);
+            Vector3 startPos = dir * sphereRadius;
+
+            bool longRay = lengthSeed > 1.0f - longRayChance || intensityScale > 1.05f;
+            float length = longRay
+                ? Mathf.Lerp(rayLengthMax * 0.68f, rayLengthMax * 1.18f, lengthSeed)
+                : Mathf.Lerp(rayLengthMin, rayLengthMax * 0.62f, lengthSeed);
+            float width = Mathf.Lerp(rayWidthMin, rayWidthMax, widthSeed) * (longRay ? 0.72f : 1.0f);
+            Color color = ColorForAngle(angleDeg, intensityScale);
+
+            ray.go.transform.localPosition = startPos;
+            ray.go.transform.localRotation = Quaternion.Euler(0f, 0f, angleDeg - 90f);
+            ray.go.transform.localScale = new Vector3(width, length, 1f);
+
+            ray.renderer.GetPropertyBlock(ray.mpb);
+            ray.mpb.SetColor("_Color", color);
+            ray.mpb.SetFloat("_Intensity", maxIntensity * intensityScale * GetRayIntensityScale());
+            ray.mpb.SetFloat("_Length", length);
+            ray.mpb.SetFloat("_Width", width);
+            ray.mpb.SetFloat("_Softness", Mathf.Lerp(3.0f, 6.0f, Hash01(widthSeed * 13.0f + 1.0f)));
+            ray.renderer.SetPropertyBlock(ray.mpb);
+
+            ray.lifetime = flashDuration * lifetimeScale;
+            ray.baseIntensity = maxIntensity * intensityScale * GetRayIntensityScale() * (longRay ? 0.85f : 1.0f);
             ray.startLength = length;
         }
 
@@ -314,6 +368,36 @@ namespace Ediskrad.AudioVisualizer
         {
             float minDelay = minDelayOverride >= 0f ? minDelayOverride : burstIntervalMin;
             nextBurstTime = Time.time + Random.Range(minDelay, burstIntervalMax);
+        }
+
+        private void EnsureController()
+        {
+            if (controller == null)
+                controller = GetComponentInParent<EnergySphereController>();
+        }
+
+        private float GetRayIntensityScale()
+        {
+            return controller != null ? controller.rayIntensity : 1.0f;
+        }
+
+        private static float Smooth01(float x)
+        {
+            x = Mathf.Clamp01(x);
+            return x * x * (3.0f - 2.0f * x);
+        }
+
+        private static float SmoothPulse(float phase, float attackEnd, float holdEnd, float releaseEnd)
+        {
+            float attack = Smooth01(Mathf.InverseLerp(0.0f, attackEnd, phase));
+            float release = 1.0f - Smooth01(Mathf.InverseLerp(holdEnd, releaseEnd, phase));
+            return Mathf.Clamp01(Mathf.Min(attack, release));
+        }
+
+        private static float Hash01(float value)
+        {
+            float h = Mathf.Sin(value * 12.9898f) * 43758.5453f;
+            return h - Mathf.Floor(h);
         }
     }
 }

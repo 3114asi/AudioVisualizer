@@ -26,10 +26,12 @@ Material:
     m_Ints: []
     m_Floats:
     - _FlowOffset: 0
-    - _Intensity: 0
+    - _FreezeTime: 1
+    - _Intensity: 1.9937501
     - _NoiseStrength: 0
-    - _Pulse: 1
+    - _Pulse: 1.375
     - _SegmentContrast: 0.5
+    - _StaticTime: 0
     m_Colors:
     - _ColorA: {r: 0, g: 1.4, b: 5.5, a: 1}
     - _ColorB: {r: 7, g: 0, b: 6, a: 1}

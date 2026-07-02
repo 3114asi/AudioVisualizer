@@ -27,7 +27,11 @@ namespace Ediskrad.AudioVisualizer
             EnergySparkSystem sparks = CreateSparks(root);
             EnergyAtmosphereParticles atmosphere = CreateAtmosphere(root);
 
-            SetupController(root, ring, inner);
+            EnergySphereController controller = SetupController(root, ring, inner);
+            rays.controller = controller;
+            hotspots.controller = controller;
+            sparks.controller = controller;
+            atmosphere.controller = controller;
 
             rays.EnsureInitialized();
             hotspots.EnsureInitialized();
@@ -131,8 +135,8 @@ namespace Ediskrad.AudioVisualizer
             mat.SetFloat("_RingCenterX", SphereCenter.x);
             mat.SetFloat("_RingCenterY", SphereCenter.y);
             mat.SetFloat("_RingRadius", RingRadius);
-            mat.SetFloat("_Thickness", 0.020f);
-            mat.SetFloat("_CoreWidth", 0.0065f);
+            mat.SetFloat("_Thickness", 0.017f);
+            mat.SetFloat("_CoreWidth", 0.0058f);
             mat.SetFloat("_GlowWidth", 0.066f);
             mat.SetFloat("_OuterHaloWidth", 0.27f);
             mat.SetFloat("_AtmosWidth", 0.90f);
@@ -148,11 +152,13 @@ namespace Ediskrad.AudioVisualizer
             mat.SetFloat("_WarmAngle", 0.28f);
             mat.SetFloat("_WarmSharpness", 1.65f);
             mat.SetFloat("_AngleStrength", 0.88f);
-            mat.SetFloat("_PulseAmp", 0.026f);
-            mat.SetFloat("_PulseSpeed", 1.15f);
+            mat.SetFloat("_BlueColorWeight", 1.05f);
+            mat.SetFloat("_PinkColorWeight", 0.88f);
+            mat.SetFloat("_PulseAmp", 0.018f);
+            mat.SetFloat("_PulseSpeed", 0.55f);
             mat.SetFloat("_NoiseAmp", 0.018f);
             mat.SetFloat("_NoiseFreq", 5.0f);
-            mat.SetFloat("_NoiseSpeed", 0.32f);
+            mat.SetFloat("_NoiseSpeed", 0.18f);
             mat.SetFloat("_HotspotWidth", 0.085f);
             mat.SetFloat("_HotspotIntensity", 8.0f);
             mat.SetFloat("_InnerDimRadius", 0.72f);
@@ -191,15 +197,15 @@ namespace Ediskrad.AudioVisualizer
             mat.SetFloat("_BaseIntensity", 0.10f);
             mat.SetFloat("_EdgeFade", 0.20f);
             mat.SetColor("_Layer1Color", new Color(0.0f, 0.55f, 1.40f, 1f));
-            mat.SetFloat("_Layer1Speed", 0.28f);
+            mat.SetFloat("_Layer1Speed", 0.18f);
             mat.SetFloat("_Layer1Freq", 3.0f);
             mat.SetFloat("_Layer1Intensity", 0.18f);
             mat.SetColor("_Layer2Color", new Color(0.65f, 0.04f, 1.20f, 1f));
-            mat.SetFloat("_Layer2Speed", -0.22f);
+            mat.SetFloat("_Layer2Speed", -0.15f);
             mat.SetFloat("_Layer2Freq", 5.5f);
             mat.SetFloat("_Layer2Intensity", 0.12f);
             mat.SetColor("_Layer3Color", new Color(1.10f, 0.08f, 0.75f, 1f));
-            mat.SetFloat("_Layer3Speed", 0.17f);
+            mat.SetFloat("_Layer3Speed", 0.11f);
             mat.SetFloat("_Layer3Freq", 8.0f);
             mat.SetFloat("_Layer3Intensity", 0.08f);
             mat.SetColor("_GridColor", new Color(0.05f, 0.58f, 1.25f, 1f));
@@ -208,8 +214,8 @@ namespace Ediskrad.AudioVisualizer
             mat.SetFloat("_DotIntensity", 0.78f);
             mat.SetFloat("_NoiseAmp", 0.14f);
             mat.SetFloat("_NoiseFreq", 5.5f);
-            mat.SetFloat("_NoiseSpeed", 0.24f);
-            mat.SetFloat("_PulseSpeed", 0.8f);
+            mat.SetFloat("_NoiseSpeed", 0.12f);
+            mat.SetFloat("_PulseSpeed", 0.30f);
             mat.SetFloat("_PulseAmp", 0.12f);
             mat.SetFloat("_Exposure", 0.72f);
 
@@ -240,13 +246,13 @@ namespace Ediskrad.AudioVisualizer
             rays.rayLengthMax = 2.35f;
             rays.rayWidthMin = 0.004f;
             rays.rayWidthMax = 0.020f;
-            rays.burstIntervalMin = 0.08f;
-            rays.burstIntervalMax = 0.24f;
+            rays.burstIntervalMin = 0.28f;
+            rays.burstIntervalMax = 0.95f;
             rays.burstCountMin = 1;
-            rays.burstCountMax = 4;
-            rays.flashDuration = 0.30f;
-            rays.maxIntensity = 7.2f;
-            rays.longRayChance = 0.08f;
+            rays.burstCountMax = 3;
+            rays.flashDuration = 1.10f;
+            rays.maxIntensity = 5.6f;
+            rays.longRayChance = 0.06f;
             return rays;
         }
 
@@ -262,12 +268,12 @@ namespace Ediskrad.AudioVisualizer
             hs.sphereRadius = RingRadius;
             hs.hotspotSizeMin = 0.12f;
             hs.hotspotSizeMax = 0.34f;
-            hs.hotspotIntensity = 9.2f;
-            hs.flashDuration = 0.42f;
-            hs.intervalMin = 0.10f;
-            hs.intervalMax = 0.48f;
+            hs.hotspotIntensity = 6.0f;
+            hs.flashDuration = 1.05f;
+            hs.intervalMin = 0.45f;
+            hs.intervalMax = 1.25f;
             hs.flashesPerEventMin = 1;
-            hs.flashesPerEventMax = 3;
+            hs.flashesPerEventMax = 2;
             return hs;
         }
 
@@ -279,20 +285,20 @@ namespace Ediskrad.AudioVisualizer
 
             EnergySparkSystem sparks = go.AddComponent<EnergySparkSystem>();
             sparks.maxParticles = 900;
-            sparks.emissionRate = 280f;
+            sparks.emissionRate = 135f;
             sparks.sphereRadius = RingRadius;
             sparks.sizeMin = 0.014f;
             sparks.sizeMax = 0.075f;
-            sparks.lifetimeMin = 0.28f;
-            sparks.lifetimeMax = 1.65f;
-            sparks.speedMin = 0.08f;
-            sparks.speedMax = 1.25f;
+            sparks.lifetimeMin = 1.65f;
+            sparks.lifetimeMax = 4.20f;
+            sparks.speedMin = 0.035f;
+            sparks.speedMax = 0.38f;
             sparks.ringSpawnChance = 0.64f;
             sparks.innerSpawnChance = 0.28f;
             sparks.outsideJitter = 0.14f;
             sparks.radialBias = 0.65f;
             sparks.tangentialBias = 0.42f;
-            sparks.turbulence = 0.18f;
+            sparks.turbulence = 0.06f;
             return sparks;
         }
 
@@ -304,7 +310,7 @@ namespace Ediskrad.AudioVisualizer
 
             EnergyAtmosphereParticles atm = go.AddComponent<EnergyAtmosphereParticles>();
             atm.maxParticles = 220;
-            atm.emissionRate = 34f;
+            atm.emissionRate = 22f;
             atm.sphereRadius = RingRadius;
             atm.spreadRadius = 3.05f;
             atm.sizeMin = 0.040f;
@@ -312,30 +318,43 @@ namespace Ediskrad.AudioVisualizer
             return atm;
         }
 
-        private static void SetupController(GameObject parent, Renderer ring, Renderer inner)
+        private static EnergySphereController SetupController(GameObject parent, Renderer ring, Renderer inner)
         {
             EnergySphereController ctrl = parent.AddComponent<EnergySphereController>();
             ctrl.ringRenderer = ring;
             ctrl.innerRenderer = inner;
             ctrl.innerMesh = inner != null ? inner.GetComponent<InnerEnergyMesh>() : null;
             ctrl.sphereTransform = parent.transform;
+            ctrl.animationDuration = 3.333333f;
+            ctrl.fadeInDuration = 0.85f;
+            ctrl.fadeOutDuration = 1.05f;
+            ctrl.pulseSpeed = 0.30f;
+            ctrl.pulseAmplitude = 0.12f;
+            ctrl.emissionMin = 0.16f;
+            ctrl.emissionMax = 1.0f;
+            ctrl.rayIntensity = 0.62f;
+            ctrl.particleLifetime = 3.2f;
+            ctrl.particleSpeed = 0.34f;
+            ctrl.blueColorWeight = 1.05f;
+            ctrl.pinkColorWeight = 0.88f;
             ctrl.ringRadius = RingRadius;
-            ctrl.ringPulseAmp = 0.026f;
-            ctrl.ringPulseSpeed = 1.15f;
+            ctrl.ringPulseAmp = 0.018f;
+            ctrl.ringPulseSpeed = 0.55f;
             ctrl.ringNoiseAmp = 0.018f;
-            ctrl.ringNoiseSpeed = 0.32f;
-            ctrl.globalPulseSpeed = 0.85f;
-            ctrl.globalPulseAmp = 0.10f;
+            ctrl.ringNoiseSpeed = 0.18f;
+            ctrl.globalPulseSpeed = 0.30f;
+            ctrl.globalPulseAmp = 0.08f;
             ctrl.corePulseAmp = 0.18f;
             ctrl.warmAngleDriftSpeed = 0.10f;
             ctrl.warmAngleDriftAmp = 0.18f;
             ctrl.baseWarmAngle = 0.28f;
-            ctrl.hotspotIntensityBase = 8.0f;
-            ctrl.hotspotCycleSpeed = 0.72f;
+            ctrl.hotspotIntensityBase = 6.2f;
+            ctrl.hotspotCycleSpeed = 0.48f;
             ctrl.hotspotWidth = 0.085f;
             ctrl.masterIntensity = 1.0f;
-            ctrl.intensityBreathSpeed = 0.52f;
-            ctrl.intensityBreathAmp = 0.09f;
+            ctrl.intensityBreathSpeed = 0.30f;
+            ctrl.intensityBreathAmp = 0.06f;
+            return ctrl;
         }
 
         private static Mesh CreateLargeQuad(float size)
